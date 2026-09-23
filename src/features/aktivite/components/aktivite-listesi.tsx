@@ -1,0 +1,116 @@
+import { MUSTERI_AKTOR_ID } from "@/features/evrak-talebi/sabitler"
+import { formatDistanceToNow } from "date-fns"
+import { tr } from "date-fns/locale"
+import { Clock01Icon } from "@hugeicons/core-free-icons"
+
+import { PersonelAvatar } from "@/components/shared/personel-avatar"
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from "@/components/shared/query-states"
+import { useAktiviteList } from "@/features/aktivite/queries"
+import { SISTEMLER } from "@/features/kasa/sistemler"
+import { formatDateTime } from "@/lib/format"
+import type { AktiviteListParams } from "@/types/api"
+import type { AktiviteEylem, Sistem } from "@/types/domain"
+
+const EYLEM_ETIKET: Record<AktiviteEylem, string> = {
+  GIRIS: "oturum açtı",
+  CIKIS: "oturumu kapattı",
+  MUKELLEF_OLUSTURULDU: "mükellefi oluşturdu",
+  MUKELLEF_GUNCELLENDI: "mükellef bilgilerini güncelledi",
+  SIFRE_EKLENDI: "şifre ekledi",
+  SIFRE_GORUNTULENDI: "şifreyi görüntüledi",
+  SIFRE_KOPYALANDI: "şifreyi kopyaladı",
+  SIFRE_GUNCELLENDI: "şifreyi güncelledi",
+  SIFRE_SILINDI: "şifreyi sildi",
+  BEYAN_DURUMU_GUNCELLENDI: "beyan durumunu güncelledi",
+  ARSIV_YUKLENDI: "arşive dosya yükledi",
+  ARSIV_GUNCELLENDI: "arşiv dosyasını güncelledi",
+  ARSIV_SILINDI: "arşiv dosyasını çöp kutusuna taşıdı",
+  ARSIV_GERI_ALINDI: "arşiv dosyasını geri aldı",
+  ARSIV_KALICI_SILINDI: "arşiv dosyasını kalıcı olarak sildi",
+  TALEP_OLUSTURULDU: "evrak talebi oluşturdu",
+  TALEP_GONDERILDI: "evrak talebini gönderdi",
+  TALEP_UZATILDI: "evrak talebinin süresini uzattı",
+  TALEP_IPTAL_EDILDI: "evrak talebini iptal etti",
+  TALEP_YENIDEN_ACILDI: "evrak talebini yeniden açtı",
+  TALEP_TAMAMLANDI: "evrak gönderimini tamamladı",
+  EVRAK_YUKLENDI: "portaldan evrak yükledi",
+  EVRAK_ONAYLANDI: "gelen evrakı onaylayıp arşive kaydetti",
+  EVRAK_REDDEDILDI: "gelen evrakı reddetti",
+  SABLON_GUNCELLENDI: "mesaj şablonunu güncelledi",
+  GOREV_OLUSTURULDU: "görev oluşturdu",
+  GOREV_GUNCELLENDI: "görevi güncelledi",
+  GOREV_DURUMU_DEGISTI: "görevin durumunu değiştirdi",
+  GOREV_ATANDI: "görevi atadı",
+  GOREV_YORUMLANDI: "göreve yorum yazdı",
+  GOREV_SILINDI: "görevi sildi",
+  DONEM_GOREVLERI_OLUSTURULDU: "dönem görevlerini oluşturdu",
+  NILVERA_BAGLANDI: "Nilvera bağlantısını kurdu",
+  NILVERA_BAGLANTI_KALDIRILDI: "Nilvera bağlantısını kaldırdı",
+  EBELGE_SENKRONIZE_EDILDI: "e-Belgeleri senkronize etti",
+  EFATURA_KABUL_EDILDI: "ticari faturayı kabul etti",
+  EFATURA_REDDEDILDI: "ticari faturayı reddetti",
+  EBELGE_ARSIVE_KAYDEDILDI: "faturayı arşive kaydetti",
+}
+
+export function AktiviteListesi(params: AktiviteListParams) {
+  const aktivite = useAktiviteList(params)
+
+  if (aktivite.isPending) return <LoadingState />
+  if (aktivite.isError) {
+    return (
+      <ErrorState error={aktivite.error} onRetry={() => aktivite.refetch()} />
+    )
+  }
+  if (aktivite.data.length === 0) {
+    return <EmptyState icon={Clock01Icon} title="Henüz aktivite yok" />
+  }
+
+  return (
+    <ol className="grid gap-3" aria-label="Aktivite geçmişi">
+      {aktivite.data.map((a) => {
+        const detay =
+          a.hedefTip === "CREDENTIAL" && a.aciklama
+            ? ` (${SISTEMLER[a.aciklama as Sistem]?.ad ?? a.aciklama})`
+            : a.aciklama && a.eylem !== "MUKELLEF_OLUSTURULDU"
+              ? ` — ${a.aciklama}`
+              : ""
+        return (
+          <li key={a.id} className="flex items-start gap-3 text-sm">
+            {a.aktor ? (
+              <PersonelAvatar personel={a.aktor} size="sm" />
+            ) : (
+              <span className="size-6" />
+            )}
+            <div className="grid min-w-0 flex-1 leading-snug">
+              <span>
+                <span className="font-medium">
+                  {a.aktor
+                    ? `${a.aktor.ad} ${a.aktor.soyad}`
+                    : a.aktorId === MUSTERI_AKTOR_ID
+                      ? "Müşteri"
+                      : "Sistem"}
+                </span>{" "}
+                {EYLEM_ETIKET[a.eylem]}
+                {detay}
+              </span>
+              <time
+                dateTime={a.zaman}
+                title={formatDateTime(a.zaman)}
+                className="text-xs text-muted-foreground"
+              >
+                {formatDistanceToNow(new Date(a.zaman), {
+                  addSuffix: true,
+                  locale: tr,
+                })}
+              </time>
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}

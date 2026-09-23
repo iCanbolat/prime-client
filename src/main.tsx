@@ -2,13 +2,26 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
 import "./index.css"
-import App from "./App.tsx"
-import { ThemeProvider } from "@/components/theme-provider.tsx"
+import { App } from "@/app/app"
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ThemeProvider>
+const mocksEnabled =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCKS === "true"
+
+async function enableMocking() {
+  if (!mocksEnabled) return
+  const { worker } = await import("@/mocks/browser")
+  await worker.start({
+    onUnhandledRequest(request, print) {
+      // Yalnızca karşılanmamış API isteklerini uyar; statik dosyalar/HMR sessizce geçer.
+      if (new URL(request.url).pathname.startsWith("/api/")) print.warning()
+    },
+  })
+}
+
+enableMocking().then(() => {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
       <App />
-    </ThemeProvider>
-  </StrictMode>
-)
+    </StrictMode>
+  )
+})

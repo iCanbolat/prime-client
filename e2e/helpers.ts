@@ -1,0 +1,63 @@
+import { expect, type Page } from "@playwright/test"
+
+export const DEMO_KASA_SIFRESI = "demo1234"
+
+/** Seed personeli: `p_1` yönetici, diğerleri personel. */
+export const KULLANICI = {
+  yonetici: "Ayşe Yılmaz",
+  personel: "Mehmet Kaya",
+} as const
+
+/** Giriş ekranından hazır kullanıcıyla oturum açar ve gösterge paneline iner. */
+export async function girisYap(page: Page, ad: string = KULLANICI.yonetici) {
+  await page.goto("/login")
+  await page.getByRole("button", { name: new RegExp(ad) }).click()
+  await expect(page).toHaveURL("/")
+  await expect(
+    page.getByRole("heading", { name: `Merhaba, ${ad.split(" ")[0]}` })
+  ).toBeVisible()
+}
+
+/** Seed ile çakışmayan geçerli (checksum'lı) VKN üretir. */
+export function rastgeleVkn(): string {
+  const d = Array.from({ length: 9 }, (_, i) =>
+    i === 0 ? 1 + Math.floor(Math.random() * 9) : Math.floor(Math.random() * 10)
+  )
+  let sum = 0
+  for (let i = 0; i < 9; i++) {
+    const tmp = (d[i] + (9 - i)) % 10
+    let weighted = (tmp * 2 ** (9 - i)) % 9
+    if (tmp !== 0 && weighted === 0) weighted = 9
+    sum += weighted
+  }
+  return [...d, (10 - (sum % 10)) % 10].join("")
+}
+
+/** Kilit penceresine ana şifreyi girer. */
+export async function kasaKilidiniAc(page: Page) {
+  const dialog = page.getByRole("dialog", { name: /kilidini aç/ })
+  await dialog.getByLabel("Ana şifre").fill(DEMO_KASA_SIFRESI)
+  await dialog.getByRole("button", { name: "Kilidi aç" }).click()
+  await expect(dialog).toBeHidden()
+}
+
+/** Seed'deki aktif (süresi dolmamış) bir evrak talebinin portal token'ı. */
+export async function aktifPortalTokeni(page: Page): Promise<string> {
+  await page.goto("/login")
+  // Mock DB ilk API isteğinde oluşur; giriş listesi gelince hazırdır
+  await expect(
+    page.getByRole("button", { name: new RegExp(KULLANICI.yonetici) })
+  ).toBeVisible()
+  const token = await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) =>
+      k.startsWith("prime-ofis:db:")
+    )!
+    const db = JSON.parse(localStorage.getItem(key)!)
+    return db.talep.find(
+      (t: { durum: string; sonKullanma: string }) =>
+        t.durum === "AKTIF" && t.sonKullanma > new Date().toISOString()
+    )?.token as string | undefined
+  })
+  expect(token).toBeTruthy()
+  return token!
+}
