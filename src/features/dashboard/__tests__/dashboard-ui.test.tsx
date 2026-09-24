@@ -10,13 +10,19 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
-const kpi = (label: string) =>
-  within(screen.getByRole("list", { name: "Özet" }))
-    .getByText(label)
-    .closest("[data-slot=kpi]") as HTMLElement
+/** Yapılacaklar sekmesindeki sayaç */
+const sekmeSayisi = (ad: RegExp) =>
+  Number(
+    within(screen.getByRole("tab", { name: ad })).getByText(/^\d+$/).textContent
+  )
+
+const dikkatSatiri = (etiket: string) =>
+  within(screen.getByRole("list", { name: "Dikkat gerektirenler" }))
+    .getByText(etiket)
+    .closest("[data-slot=dikkat]") as HTMLElement
 
 describe("Gösterge paneli", () => {
-  it("özet göstergeleri: bu hafta, geciken, onay bekleyen, belge uyarısı", async () => {
+  it("Yapılacaklar sekme sayaçları: bu hafta, geciken, onay bekleyen", async () => {
     db.takvim.insert({
       id: "m_as:KDV:2026-08",
       mukellefId: "m_as",
@@ -28,27 +34,39 @@ describe("Gösterge paneli", () => {
     })
     renderRoute("/", { as: TEST_USERS.yonetici })
 
-    await screen.findByRole("list", { name: "Özet" })
-    await waitFor(() =>
-      expect(
-        within(kpi("Bu hafta son günü olan")).getByText("9")
-      ).toBeInTheDocument()
-    )
-    expect(within(kpi("Aktif mükellef")).getByText("3")).toBeInTheDocument()
-    expect(within(kpi("Onay bekleyen")).getByText("1")).toBeInTheDocument()
+    await waitFor(() => expect(sekmeSayisi(/^Bu hafta/)).toBe(9))
+    expect(sekmeSayisi(/^Onay bekleyen/)).toBe(1)
+    expect(sekmeSayisi(/^Gecikenler/)).toBeGreaterThan(0)
+    expect(screen.queryByRole("list", { name: "Özet" })).not.toBeInTheDocument()
     expect(
-      Number(within(kpi("Geciken")).getByText(/^\d+$/).textContent)
-    ).toBeGreaterThan(0)
-    // Fixture: A.Ş. imza sirkülerinin süresi dolmuş, Ltd faaliyet belgesine 20 gün var
-    await waitFor(() =>
-      expect(within(kpi("Belge uyarısı")).getByText("2")).toBeInTheDocument()
-    )
-    expect(
-      within(kpi("Belge uyarısı")).getByText("1 belgenin süresi doldu")
-    ).toBeInTheDocument()
+      screen.queryByRole("list", { name: "Personel iş yükü" })
+    ).not.toBeInTheDocument()
+  })
 
-    const isYuku = screen.getByRole("list", { name: "Personel iş yükü" })
-    expect(await within(isYuku).findByText(/Zeynep Demir/)).toBeInTheDocument()
+  it("bağımsız görevler Yapılacaklar'da görünür, beyana bağlı görevler tekrarlanmaz", async () => {
+    const { user } = renderRoute("/", { as: TEST_USERS.yonetici })
+    await screen.findByRole("tabpanel")
+    const panel = () => screen.getByRole("tabpanel")
+
+    // o_kdv_ltd (28.09, beyana bağlı) yalnızca beyan satırındaki görev linkiyle görünür
+    const gun = await within(panel()).findByRole("region", {
+      name: "28.09.2026",
+    })
+    expect(
+      within(gun).queryByRole("listitem", { name: /^Görev:/ })
+    ).not.toBeInTheDocument()
+    expect(
+      within(gun).getAllByRole("link", { name: /^Görev: / }).length
+    ).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole("tab", { name: /Gecikenler/ }))
+    const gorev = await within(panel()).findByRole("listitem", {
+      name: /^Görev: Vergi levhası güncelleme/,
+    })
+    expect(
+      within(gorev).getByRole("link", { name: "Vergi levhası güncelleme" })
+    ).toHaveAttribute("href", "/gorevler?gorev=o_vergi")
+    expect(within(gorev).getByText("Gecikti")).toBeInTheDocument()
   })
 
   it("Yapılacaklar sekmeleri listeyi değiştirir", async () => {
@@ -80,42 +98,60 @@ describe("Gösterge paneli", () => {
     )
   })
 
-  it("belge uyarıları: süresi dolan belge ve eksik zorunlu evrak listelenir", async () => {
+  it("dikkat kartı: yalnızca sıfırdan büyük uyarılar, tehlike önce", async () => {
     renderRoute("/", { as: TEST_USERS.yonetici })
-    const suresi = await screen.findByRole("region", {
-      name: "Süresi dolan belgeler",
+    const liste = await screen.findByRole("list", {
+      name: "Dikkat gerektirenler",
     })
-    expect(within(suresi).getByText("Süresi doldu")).toBeInTheDocument()
-    expect(within(suresi).getByText("20 gün kaldı")).toBeInTheDocument()
+    // Fixture: A.Ş. imza sirkülerinin süresi dolmuş, Ltd faaliyet belgesine 20 gün var
+    await waitFor(() =>
+      expect(
+        within(dikkatSatiri("Süresi dolan belge")).getByText("1")
+      ).toBeInTheDocument()
+    )
+    expect(
+      within(dikkatSatiri("30 gün içinde dolacak belge")).getByText("1")
+    ).toBeInTheDocument()
+    // Satırlar hedef sayfada aynı kümeyi gösteren filtreyle açılır
+    expect(
+      within(dikkatSatiri("Süresi dolan belge")).getByRole("link")
+    ).toHaveAttribute(
+      "href",
+      "/arsiv?gecerlilik=doldu&sirala=gecerlilikTarihi&gorunum=liste"
+    )
+    expect(
+      within(dikkatSatiri("30 gün içinde dolacak belge")).getByRole("link")
+    ).toHaveAttribute(
+      "href",
+      "/arsiv?gecerlilik=yakinda&sirala=gecerlilikTarihi&gorunum=liste"
+    )
+    // Fixture'da yalnızca Ltd'nin eksiği var: doğrudan klasörü açılır
+    expect(
+      within(dikkatSatiri("Eksik zorunlu evrak")).getByRole("link")
+    ).toHaveAttribute("href", "/arsiv?mukellef=m_ltd")
 
-    const eksik = screen.getByRole("region", { name: "Eksik zorunlu evraklar" })
-    const link = within(eksik).getByRole("link", { name: /Çınar Yazılım/ })
-    expect(link).toHaveAttribute("href", "/mukellefler/m_ltd/arsiv")
-    expect(within(link).getByText("İmza sirküleri")).toBeInTheDocument()
+    const satirlar = within(liste)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent ?? "")
+    const tehlike = satirlar.findIndex((t) => t.includes("Süresi dolan belge"))
+    const uyari = satirlar.findIndex((t) =>
+      t.includes("30 gün içinde dolacak belge")
+    )
+    expect(tehlike).toBeLessThan(uyari)
   })
 
-  it("'Benim mükelleflerim' yalnızca kullanıcının mükelleflerini sayar, iş yükünü gizler", async () => {
+  it("'Benim mükelleflerim' yalnızca kullanıcının mükelleflerini sayar", async () => {
     const { router, user } = renderRoute("/", { as: TEST_USERS.personel }) // Mehmet: m_sahis, m_as
-    await screen.findByRole("list", { name: "Personel iş yükü" })
+    await screen.findByText("Eksik zorunlu evrak")
     await user.click(
       screen.getByRole("button", { name: "Benim mükelleflerim" })
     )
 
     expect(router.state.location.search).toBe("?kapsam=benim")
-    await waitFor(() =>
-      expect(
-        within(kpi("Bu hafta son günü olan")).getByText("5")
-      ).toBeInTheDocument()
-    )
-    expect(within(kpi("Aktif mükellef")).getByText("2")).toBeInTheDocument()
-    expect(
-      screen.queryByRole("list", { name: "Personel iş yükü" })
-    ).not.toBeInTheDocument()
+    await waitFor(() => expect(sekmeSayisi(/^Bu hafta/)).toBe(5))
     // Ltd (Zeynep'in) eksik evrak uyarısı bu kapsamda görünmez
     await waitFor(() =>
-      expect(
-        screen.queryByRole("region", { name: "Eksik zorunlu evraklar" })
-      ).not.toBeInTheDocument()
+      expect(screen.queryByText("Eksik zorunlu evrak")).not.toBeInTheDocument()
     )
   })
 

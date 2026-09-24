@@ -7,10 +7,16 @@ import { simulationHandler } from "@/mocks/handlers/common"
 import { devHandlers } from "@/mocks/handlers/dev"
 import { eBelgeHandlers } from "@/mocks/handlers/e-belge"
 import { evrakTalebiHandlers } from "@/mocks/handlers/evrak-talebi"
+import { fisAktarimiHandlers } from "@/mocks/handlers/fis-aktarimi"
 import { gorevHandlers } from "@/mocks/handlers/gorev"
+import { kanalHandlers } from "@/mocks/handlers/kanal"
+import { iceAktarimHandlers } from "@/mocks/handlers/ice-aktarim"
 import { kasaHandlers } from "@/mocks/handlers/kasa"
 import { mukellefHandlers } from "@/mocks/handlers/mukellef"
+import { personelHandlers } from "@/mocks/handlers/personel"
 import { portalHandlers } from "@/mocks/handlers/portal"
+import { tahsilatHandlers } from "@/mocks/handlers/tahsilat"
+import { tebligatHandlers } from "@/mocks/handlers/tebligat"
 import { takvimHandlers } from "@/mocks/handlers/takvim"
 
 /** Sıra önemli: simülasyon handler'ı her zaman ilk sırada kalmalı. */
@@ -19,6 +25,7 @@ export const handlers = [
   ...devHandlers,
   ...authHandlers,
   ...buroHandlers,
+  ...personelHandlers,
   ...mukellefHandlers,
   ...kasaHandlers,
   ...aktiviteHandlers,
@@ -28,5 +35,10 @@ export const handlers = [
   ...portalHandlers,
   ...gorevHandlers,
   ...eBelgeHandlers,
+  ...iceAktarimHandlers,
+  ...fisAktarimiHandlers,
+  ...tahsilatHandlers,
+  ...tebligatHandlers,
+  ...kanalHandlers,
   ...bildirimHandlers,
 ]

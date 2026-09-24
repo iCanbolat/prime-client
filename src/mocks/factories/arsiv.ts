@@ -22,6 +22,10 @@ const DOSYA_ADLARI: Record<ArsivKategori, string[]> = {
   FAALIYET_BELGESI: ["Faaliyet belgesi.pdf", "Oda faaliyet belgesi.pdf"],
   KIMLIK: ["Kimlik ön yüz.jpg", "Kimlik fotokopisi.png"],
   FATURA: ["Fatura.pdf"],
+  BANKA_EKSTRESI: ["Banka ekstresi.pdf"],
+  TAHAKKUK: ["Tahakkuk fişi.pdf"],
+  MIZAN: ["Mizan.xlsx"],
+  TEBLIGAT: ["e-Tebligat.pdf"],
   DIGER: [
     "Banka yazısı.pdf",
     "Ruhsat.pdf",

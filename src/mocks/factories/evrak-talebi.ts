@@ -80,7 +80,7 @@ export function createEvrakTalepleri(
     const kanal = faker.helpers.arrayElement<TalepKanal>([
       "WHATSAPP",
       "WHATSAPP",
-      "SMS",
+      "EPOSTA",
       "LINK",
     ])
     const olusturanId = faker.helpers.arrayElement(personelIds)

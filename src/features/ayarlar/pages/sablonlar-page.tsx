@@ -16,30 +16,42 @@ import { Textarea } from "@/components/ui/textarea"
 import { useBuro } from "@/features/ayarlar/queries"
 import {
   SABLON_DEGISKENLERI,
+  SABLON_KURALLARI,
+  SABLON_TIPLERI,
   mesajOlustur,
+  sablonHatasi,
   portalLinki,
   talepDegiskenleri,
 } from "@/features/evrak-talebi/mesaj"
 import { VARSAYILAN_SABLONLAR } from "@/features/evrak-talebi/sabitler"
 import { useSablonlariKaydet } from "@/features/evrak-talebi/queries"
+import { formatDate, formatTRY } from "@/lib/format"
 import type { MesajSablonlari } from "@/types/api"
 import type { Buro, MesajSablonTip } from "@/types/domain"
 
 const TANIMLAR: Record<MesajSablonTip, { baslik: string; aciklama: string }> = {
   TALEP: {
     baslik: "Evrak talebi mesajı",
-    aciklama: "Yeni talep ve yeniden gönderimde WhatsApp / SMS metni",
+    aciklama: "Yeni talep ve yeniden gönderimde WhatsApp / e-posta metni",
   },
   RED: {
     baslik: "Reddedilen evrak mesajı",
     aciklama: "Evrak reddedilip talep yeniden açıldığında müşteriye gönderilir",
   },
+  TAHAKKUK: {
+    baslik: "Tahakkuk gönderimi",
+    aciklama:
+      "Beyanname tahakkuku mükellefe iletilirken (e-postada PDF eklenir)",
+  },
+  BORC_HATIRLATMA: {
+    baslik: "Ücret borcu hatırlatması",
+    aciklama: "Tahsilat ekranından açık borcu olan mükelleflere gönderilir",
+  },
 }
 
 function ornek(buro: Buro, sablon: string) {
-  return mesajOlustur(
-    sablon,
-    talepDegiskenleri({
+  return mesajOlustur(sablon, {
+    ...talepDegiskenleri({
       mukellefUnvan: "Çınar Yazılım Ltd. Şti.",
       buroAd: buro.ad,
       donem: "2026-08",
@@ -47,8 +59,14 @@ function ornek(buro: Buro, sablon: string) {
       link: portalLinki("ornek-baglanti"),
       sonKullanma: new Date(Date.now() + 7 * 864e5).toISOString(),
       neden: "Fotoğraf bulanık, okunmuyor",
-    })
-  )
+    }),
+    beyan: "KDV beyannamesi",
+    tutar: formatTRY(6749.5),
+    vade: formatDate(new Date(Date.now() + 5 * 864e5)),
+    bakiye: formatTRY(24_000),
+    donemler: "Temmuz 2026, Ağustos 2026",
+    iban: buro.iban?.replace(/(.{4})/g, "$1 ").trim() ?? "TR00 0000 …",
+  })
 }
 
 function SablonKarti({
@@ -98,8 +116,8 @@ function SablonKarti({
             onChange={(e) => onChange(e.target.value)}
           />
           <div className="flex flex-wrap gap-1.5" aria-label="Değişken ekle">
-            {SABLON_DEGISKENLERI.filter(
-              (d) => tip === "RED" || d.ad !== "neden"
+            {SABLON_DEGISKENLERI.filter((d) =>
+              SABLON_KURALLARI[tip].degiskenler.includes(d.ad)
             ).map((d) => (
               <Button
                 key={d.ad}
@@ -132,19 +150,19 @@ function SablonKarti({
 
 function Form({ buro }: { buro: Buro }) {
   const kaydet = useSablonlariKaydet()
-  const [degerler, setDegerler] = useState<MesajSablonlari>(
-    buro.mesajSablonlari ?? VARSAYILAN_SABLONLAR
-  )
+  const [degerler, setDegerler] = useState<MesajSablonlari>({
+    ...VARSAYILAN_SABLONLAR,
+    ...buro.mesajSablonlari,
+  })
   const [hatalar, setHatalar] = useState<
     Partial<Record<MesajSablonTip, string>>
   >({})
 
   const gonder = () => {
     const yeni: typeof hatalar = {}
-    for (const tip of ["TALEP", "RED"] as const) {
-      if (!degerler[tip].trim()) yeni[tip] = "Şablon boş olamaz"
-      else if (!degerler[tip].includes("{link}"))
-        yeni[tip] = "Şablon {link} değişkenini içermeli"
+    for (const tip of SABLON_TIPLERI) {
+      const hata = sablonHatasi(tip, degerler[tip])
+      if (hata) yeni[tip] = hata
     }
     setHatalar(yeni)
     if (Object.keys(yeni).length) return
@@ -156,7 +174,12 @@ function Form({ buro }: { buro: Buro }) {
 
   return (
     <div className="grid gap-4">
-      {(["TALEP", "RED"] as const).map((tip) => (
+      <p className="text-sm text-muted-foreground">
+        WhatsApp Business ile gönderimde metin Meta'da onaylı şablondan gelir;
+        buradaki metni onaya gönderdiğiniz şablonla aynı tutun. E-posta ve
+        "WhatsApp'ta aç" gönderimlerinde bu metin kullanılır.
+      </p>
+      {SABLON_TIPLERI.map((tip) => (
         <SablonKarti
           key={tip}
           tip={tip}

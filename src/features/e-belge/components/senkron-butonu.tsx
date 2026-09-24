@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useSenkron } from "@/features/e-belge/queries"
 import { cn } from "@/lib/utils"
 
-/** Nilvera'dan artımlı senkron. `mukellefId` verilmezse tüm bağlı mükellefler. */
+/** Luca'dan artımlı senkron. `mukellefId` verilmezse tüm bağlı mükellefler. */
 export function SenkronButonu({
   mukellefId,
   size = "default",

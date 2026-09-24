@@ -22,6 +22,13 @@ beforeEach(() => {
   // Hatırlatmalar testleri etkilemesin: geciken görev kalmasın
   for (const g of db.gorev.all())
     db.gorev.update(g.id, { sonTarih: "2026-12-31" })
+  // ...vadesi geçmiş ücret borcu (aylık ücret yeniden borç üretmesin)...
+  for (const h of db.cari.all()) db.cari.remove(h.id)
+  for (const m of db.mukellef.all())
+    db.mukellef.update(m.id, { ucret: undefined })
+  // ...ve süresi yaklaşan tebligat
+  for (const t of db.tebligat.all())
+    db.tebligat.update(t.id, { durum: "KAPANDI" })
 })
 afterEach(() => vi.useRealTimers())
 

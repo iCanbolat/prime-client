@@ -2,11 +2,15 @@ import type { IconSvgElement } from "@hugeicons/react"
 import {
   Calendar03Icon,
   DashboardSquare01Icon,
+  FileImportIcon,
+  Invoice01Icon,
   FolderLibraryIcon,
   Invoice03Icon,
   InboxUploadIcon,
   KanbanIcon,
+  LegalDocument01Icon,
   LockPasswordIcon,
+  MoneyReceive02Icon,
   Settings01Icon,
   UserGroupIcon,
 } from "@hugeicons/core-free-icons"
@@ -21,7 +25,7 @@ export interface NavItem {
   keywords?: string[]
   roles?: Rol[]
   /** Menüde sayaç rozeti gösterilecek veri */
-  sayac?: "gelenEvrak" | "yanitBekleyen"
+  sayac?: "gelenEvrak" | "yanitBekleyen" | "acikTebligat" | "fisTaslak"
 }
 
 export interface NavGroup {
@@ -76,6 +80,13 @@ export const NAV_GROUPS: NavGroup[] = [
         sayac: "gelenEvrak",
       },
       {
+        title: "Fiş Aktarımı",
+        to: "/fis-aktarimi",
+        icon: Invoice01Icon,
+        keywords: ["luca", "fiş", "ekstre", "ocr", "muhasebe fişi", "excel", "mahsup"],
+        sayac: "fisTaslak",
+      },
+      {
         title: "Görevler",
         to: "/gorevler",
         icon: KanbanIcon,
@@ -86,7 +97,9 @@ export const NAV_GROUPS: NavGroup[] = [
         to: "/e-belge",
         icon: Invoice03Icon,
         keywords: [
-          "nilvera",
+          "luca",
+          "entegratör",
+          "kontör",
           "e-fatura",
           "e-arşiv",
           "e-defter",
@@ -94,6 +107,25 @@ export const NAV_GROUPS: NavGroup[] = [
           "fatura",
         ],
         sayac: "yanitBekleyen",
+      },
+      {
+        title: "e-Tebligat",
+        to: "/tebligat",
+        icon: LegalDocument01Icon,
+        keywords: ["tebligat", "ödeme emri", "ihbarname", "izaha davet", "ivd", "gib"],
+        sayac: "acikTebligat",
+      },
+      {
+        title: "Tahsilat",
+        to: "/tahsilat",
+        icon: MoneyReceive02Icon,
+        keywords: ["ücret", "cari", "ödeme", "alacak", "kesinti", "stopaj", "makbuz"],
+      },
+      {
+        title: "İçe Aktarım",
+        to: "/ice-aktarim",
+        icon: FileImportIcon,
+        keywords: ["tahakkuk", "mizan", "excel", "beyanname", "luca", "zirve"],
       },
     ],
   },

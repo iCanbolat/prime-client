@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query"
 
 import { aktiviteKeys } from "@/features/aktivite/queries"
+import { fisAktarimiKeys } from "@/features/fis-aktarimi/queries"
 import { arsivKeys } from "@/features/arsiv/queries"
 import { ayarlarKeys } from "@/features/ayarlar/queries"
 import { evrakTalebiApi } from "@/features/evrak-talebi/api"
@@ -69,6 +70,8 @@ function useInvalidate(arsiv = false) {
       queryClient.invalidateQueries({ queryKey: evrakTalebiKeys.all }),
       queryClient.invalidateQueries({ queryKey: aktiviteKeys.all }),
       arsiv && queryClient.invalidateQueries({ queryKey: arsivKeys.all }),
+      // Fiş / ekstre onayı okuma başlatır
+      arsiv && queryClient.invalidateQueries({ queryKey: fisAktarimiKeys.all }),
     ])
 }
 

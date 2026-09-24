@@ -10,17 +10,23 @@ import type {
   EBelgeOzetResponse,
   EBelgeView,
   EFaturaYanitRequest,
-  NilveraBaglantiView,
+  EntegratorBaglantiView,
+  KontorAlimRequest,
+  KontorAlimView,
+  KontorOzetResponse,
   SenkronRequest,
   SenkronResponse,
 } from "@/types/api"
 
 export const eBelgeApi = {
-  baglantilar: () => http.get<NilveraBaglantiView[]>("/e-belge/baglantilar"),
+  baglantilar: () => http.get<EntegratorBaglantiView[]>("/e-belge/baglantilar"),
   baglanti: (mukellefId: string) =>
-    http.get<NilveraBaglantiView>(`/e-belge/baglantilar/${mukellefId}`),
+    http.get<EntegratorBaglantiView>(`/e-belge/baglantilar/${mukellefId}`),
   baglantiKaydet: (mukellefId: string, body: BaglantiKaydetRequest) =>
-    http.put<NilveraBaglantiView>(`/e-belge/baglantilar/${mukellefId}`, body),
+    http.put<EntegratorBaglantiView>(
+      `/e-belge/baglantilar/${mukellefId}`,
+      body
+    ),
   baglantiKaldir: (mukellefId: string) =>
     http.delete<void>(`/e-belge/baglantilar/${mukellefId}`),
   senkron: (body: SenkronRequest = {}) =>
@@ -38,6 +44,10 @@ export const eBelgeApi = {
     http.post<EBelgeView>(`/e-belge/faturalar/${id}/arsive-kaydet`),
   beratlar: (params: BeratListParams = {}) =>
     http.get<BeratListResponse>("/e-belge/beratlar", { params: { ...params } }),
+  kontor: (params: { donem?: string } = {}) =>
+    http.get<KontorOzetResponse>("/e-belge/kontor", { params: { ...params } }),
+  kontorAlimEkle: (body: KontorAlimRequest) =>
+    http.post<KontorAlimView>("/e-belge/kontor/alimlar", body),
   ozet: (params: { sorumlu?: string } = {}) =>
     http.get<EBelgeOzetResponse>("/e-belge/ozet", { params: { ...params } }),
 }

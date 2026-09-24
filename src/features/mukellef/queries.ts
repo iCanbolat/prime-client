@@ -30,6 +30,7 @@ export function useMukellef(id: string) {
   return useQuery({
     queryKey: mukellefKeys.detail(id),
     queryFn: () => mukellefApi.detail(id),
+    enabled: Boolean(id),
   })
 }
 

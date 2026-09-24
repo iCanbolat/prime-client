@@ -10,7 +10,9 @@ import type {
   EBelgeListResponse,
   EBelgeOzetResponse,
   EBelgeView,
-  NilveraBaglantiView,
+  EntegratorBaglantiView,
+  KontorAlimView,
+  KontorOzetResponse,
   SenkronResponse,
   TakvimOlayi,
 } from "@/types/api"
@@ -57,6 +59,8 @@ describe("GET /api/e-belge/faturalar", () => {
       "f_yakin",
     ])
     expect(await idler({ yanit: "SURESI_DOLDU" })).toEqual(["f_doldu"])
+    // Panodaki "Yanıt süresi dolmak üzere" ile aynı küme
+    expect(await idler({ yanitYaklasan: true })).toEqual(["f_yakin"])
     expect(await idler({ mukellefId: "m_as" })).toEqual(["f_as"])
   })
 
@@ -189,7 +193,7 @@ describe("POST /api/e-belge/senkron", () => {
     // Yeni faturalar mükellefin gelen kutusuna düşer
     for (const e of db.ebelge.all().slice(onceki))
       expect(e).toMatchObject({ yon: "GELEN", mukellefId: "m_ltd" })
-    expect(db.nilvera.find("n_m_ltd")?.sonSenkron).toBe(
+    expect(db.baglanti.find("n_m_ltd")?.sonSenkron).toBe(
       new Date().toISOString()
     )
 
@@ -240,15 +244,17 @@ describe("POST /api/e-belge/senkron", () => {
   })
 })
 
-describe("Nilvera bağlantıları", () => {
+describe("Luca bağlantıları", () => {
   const baglan = (mukellefId: string, apiAnahtari: string) =>
-    http.put<NilveraBaglantiView>(`/e-belge/baglantilar/${mukellefId}`, {
+    http.put<EntegratorBaglantiView>(`/e-belge/baglantilar/${mukellefId}`, {
       apiAnahtari,
       ortam: "TEST",
     })
 
   it("tüm aktif mükellefleri durumlarıyla listeler", async () => {
-    const liste = await http.get<NilveraBaglantiView[]>("/e-belge/baglantilar")
+    const liste = await http.get<EntegratorBaglantiView[]>(
+      "/e-belge/baglantilar"
+    )
     expect(liste.map((b) => [b.mukellefId, b.durum])).toEqual([
       ["m_sahis", "BAGLI_DEGIL"],
       ["m_ltd", "BAGLI"],
@@ -276,7 +282,7 @@ describe("Nilvera bağlantıları", () => {
     expect(JSON.stringify(b)).not.toContain(anahtar)
     expect(localStorage.getItem(STORAGE_KEY)).not.toContain(anahtar)
     expect(db.aktivite.all().at(-1)).toMatchObject({
-      eylem: "NILVERA_BAGLANDI",
+      eylem: "ENTEGRATOR_BAGLANDI",
       mukellefId: "m_sahis",
     })
   })
@@ -288,7 +294,8 @@ describe("Nilvera bağlantıları", () => {
     expect(b.hataMesaji).toBeUndefined()
     await http.delete("/e-belge/baglantilar/m_as")
     expect(
-      (await http.get<NilveraBaglantiView>("/e-belge/baglantilar/m_as")).durum
+      (await http.get<EntegratorBaglantiView>("/e-belge/baglantilar/m_as"))
+        .durum
     ).toBe("BAGLI_DEGIL")
     expect(await hataDurumu(http.delete("/e-belge/baglantilar/m_as"))).toBe(404)
   })
@@ -320,6 +327,7 @@ describe("GET /api/e-belge/beratlar ve /ozet", () => {
     expect(ozet).toMatchObject({
       yanitBekleyen: 2,
       hataliGonderim: 1,
+      hataliEArsiv: 0,
       baglantiHatasi: 1,
       bagliMukellef: 1,
       beratGeciken: 9,
@@ -330,5 +338,83 @@ describe("GET /api/e-belge/beratlar ve /ozet", () => {
     })
     // p_2: m_sahis (bağlı değil) ve m_as (hatalı)
     expect(sahis).toMatchObject({ yanitBekleyen: 0, baglantiHatasi: 1 })
+  })
+})
+
+describe("Kontör", () => {
+  // Fixture: 100 + 20 hediye = 120 kontör, 132 TL. Eylül 7, Ağustos 2 belge.
+  it("GET /kontor bakiye, dönem tüketimi ve alımları döner", async () => {
+    const k = await http.get<KontorOzetResponse>("/e-belge/kontor")
+    expect(k).toMatchObject({
+      donem: "2026-09",
+      toplamAlinan: 120,
+      toplamTuketim: 9,
+      kalan: 111,
+      aylikOrtalama: 1,
+      dusukBakiye: false,
+    })
+    expect(k.birimMaliyet).toBeCloseTo(1.1)
+    expect(k.mukellefler).toEqual([
+      expect.objectContaining({
+        mukellefId: "m_ltd",
+        gelen: 4,
+        giden: 3,
+        toplam: 7,
+        tutar: expect.closeTo(7.7) as number,
+      }),
+    ])
+    expect(k.aylik.map((a) => a.tuketim)).toEqual([0, 0, 0, 0, 2, 7])
+    expect(k.alimlar[0]).toMatchObject({ id: "u_1", ekleyenAd: "Ayşe Yılmaz" })
+
+    const agustos = await http.get<KontorOzetResponse>("/e-belge/kontor", {
+      params: { donem: "2026-08" },
+    })
+    expect(agustos.mukellefler.map((m) => m.mukellefId).sort()).toEqual([
+      "m_as",
+      "m_ltd",
+    ])
+  })
+
+  it("alımı yalnızca yönetici ekler; bakiye ve aktivite güncellenir", async () => {
+    const body = {
+      tarih: "2026-09-20",
+      paketAdet: 250,
+      hediyeAdet: 50,
+      tutar: 480,
+    }
+    expect(await hataDurumu(http.post("/e-belge/kontor/alimlar", body))).toBe(
+      403
+    )
+
+    oturum(yonetici)
+    expect(
+      await hataDurumu(
+        http.post("/e-belge/kontor/alimlar", { ...body, tarih: "2026-09-24" })
+      )
+    ).toBe(400)
+    expect(
+      await hataDurumu(
+        http.post("/e-belge/kontor/alimlar", { ...body, paketAdet: 0 })
+      )
+    ).toBe(400)
+
+    const kayit = await http.post<KontorAlimView>("/e-belge/kontor/alimlar", {
+      ...body,
+      not: "  Eylül  ",
+    })
+    expect(kayit).toMatchObject({ ekleyenId: yonetici.id, not: "Eylül" })
+    const k = await http.get<KontorOzetResponse>("/e-belge/kontor")
+    expect(k.kalan).toBe(411)
+    expect(k.alimlar.map((a) => a.id)).toEqual([kayit.id, "u_1"])
+    expect(db.aktivite.all().at(-1)).toMatchObject({
+      eylem: "KONTOR_ALINDI",
+      aciklama: "300 kontör",
+    })
+  })
+
+  it("özet düşük bakiyeyi bildirir", async () => {
+    db.kontor.update("u_1", { paketAdet: 5, hediyeAdet: 0 })
+    const ozet = await http.get<EBelgeOzetResponse>("/e-belge/ozet")
+    expect(ozet).toMatchObject({ kontorKalan: -4, kontorDusuk: true })
   })
 })

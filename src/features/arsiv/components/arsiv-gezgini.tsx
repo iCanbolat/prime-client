@@ -31,6 +31,7 @@ import {
 import type { DosyaIslemleri } from "@/features/arsiv/components/dosya-islemleri"
 import {
   ARSIV_SAYFA_BOYUTU,
+  GECERLILIK_FILTRE_ETIKET,
   type ArsivParams,
   type useArsivParams,
 } from "@/features/arsiv/hooks/use-arsiv-params"
@@ -49,6 +50,15 @@ const SIRALAMA_ETIKET = {
 } satisfies Record<`${ArsivSiralama}:${SiralamaYonu}`, string>
 
 type Siralama = keyof typeof SIRALAMA_ETIKET
+
+const TUMU = "__tumu__"
+
+const GECERLILIK_SECENEKLERI = {
+  [TUMU]: "Tüm belgeler",
+  ...GECERLILIK_FILTRE_ETIKET,
+}
+
+type GecerlilikSecimi = keyof typeof GECERLILIK_SECENEKLERI
 type Update = ReturnType<typeof useArsivParams>["update"]
 
 /**
@@ -84,40 +94,73 @@ export function ArsivAraclari({
       <div className="flex items-center gap-2">{baslangic}</div>
       <div className="flex items-center gap-2">
         <FiltreSheet
-          deger={{ siralama }}
-          varsayilan={{ siralama: "ad:asc" as Siralama }}
-          // Sıralama "filtre" sayılmaz; rozet göstermez
-          aktifSayi={0}
-          aciklama="Dosyaların sıralamasını seçin."
-          onUygula={({ siralama }) => {
+          deger={{
+            siralama,
+            gecerlilik: (params.gecerlilik ?? TUMU) as GecerlilikSecimi,
+          }}
+          varsayilan={{
+            siralama: "ad:asc" as Siralama,
+            gecerlilik: TUMU as GecerlilikSecimi,
+          }}
+          // Sıralama "filtre" sayılmaz; rozet yalnızca geçerlilik için
+          aktifSayi={params.gecerlilik ? 1 : 0}
+          onUygula={({ siralama, gecerlilik }) => {
             const [sirala, yon] = siralama.split(":") as [
               ArsivSiralama,
               SiralamaYonu,
             ]
-            update({ sirala, yon })
+            update({
+              sirala,
+              yon,
+              gecerlilik: gecerlilik === TUMU ? null : gecerlilik,
+            })
           }}
         >
           {(taslak, degistir) => (
-            <FiltreAlani etiket="Sıralama" htmlFor="filtre-siralama">
-              <Select
-                items={SIRALAMA_ETIKET}
-                value={taslak.siralama}
-                onValueChange={(v) =>
-                  v && degistir({ siralama: v as Siralama })
-                }
-              >
-                <SelectTrigger id="filtre-siralama" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(SIRALAMA_ETIKET).map(([k, ad]) => (
-                    <SelectItem key={k} value={k}>
-                      {ad}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FiltreAlani>
+            <>
+              {!params.cop && (
+                <FiltreAlani etiket="Geçerlilik" htmlFor="filtre-gecerlilik">
+                  <Select
+                    items={GECERLILIK_SECENEKLERI}
+                    value={taslak.gecerlilik}
+                    onValueChange={(v) =>
+                      v && degistir({ gecerlilik: v as GecerlilikSecimi })
+                    }
+                  >
+                    <SelectTrigger id="filtre-gecerlilik" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(GECERLILIK_SECENEKLERI).map(([k, ad]) => (
+                        <SelectItem key={k} value={k}>
+                          {ad}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FiltreAlani>
+              )}
+              <FiltreAlani etiket="Sıralama" htmlFor="filtre-siralama">
+                <Select
+                  items={SIRALAMA_ETIKET}
+                  value={taslak.siralama}
+                  onValueChange={(v) =>
+                    v && degistir({ siralama: v as Siralama })
+                  }
+                >
+                  <SelectTrigger id="filtre-siralama" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(SIRALAMA_ETIKET).map(([k, ad]) => (
+                      <SelectItem key={k} value={k}>
+                        {ad}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FiltreAlani>
+            </>
           )}
         </FiltreSheet>
         <GorunumToggle
@@ -162,6 +205,7 @@ export function DosyaAlani({
     sirala: params.sirala,
     yon: params.yon,
     cop: params.cop || undefined,
+    gecerlilik: params.cop ? undefined : params.gecerlilik,
     sayfa: params.sayfa,
     sayfaBoyutu: ARSIV_SAYFA_BOYUTU,
   })
@@ -189,11 +233,14 @@ export function DosyaAlani({
       <EmptyState
         icon={FolderOpenIcon}
         title={
-          params.q ? "Aramayla eşleşen dosya yok" : "Bu klasörde dosya yok"
+          params.q || params.gecerlilik
+            ? "Filtreyle eşleşen dosya yok"
+            : "Bu klasörde dosya yok"
         }
         action={
           onYukle &&
-          !params.q && (
+          !params.q &&
+          !params.gecerlilik && (
             <Button size="sm" onClick={onYukle}>
               <HugeiconsIcon
                 icon={Upload04Icon}

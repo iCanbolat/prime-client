@@ -123,7 +123,7 @@ export function AppLayout() {
         <div
           id="icerik"
           tabIndex={-1}
-          className="flex min-w-0 flex-1 scroll-mt-14 flex-col gap-6 p-4 outline-none md:p-6"
+          className="isolate flex min-w-0 flex-1 scroll-mt-14 flex-col gap-6 p-4 outline-none md:p-6"
         >
           <Outlet />
         </div>

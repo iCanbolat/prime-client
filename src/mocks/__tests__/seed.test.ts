@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { kesintiKarsilastir } from "@/features/tahsilat/kurallar"
 import { isValidTckn, isValidVkn } from "@/lib/tax-id"
 import { DEFAULT_SEED, createSeed } from "@/mocks/seed"
 
@@ -100,11 +101,11 @@ describe("createSeed", () => {
   })
 
   it("e-Belge verisi tutarlı: bağlantı yalnızca aktif mükellefte, faturalar bağlı mükelleflerde", () => {
-    const { mukellef, nilvera, ebelge, berat, takvim } = createSeed()
+    const { mukellef, baglanti, ebelge, berat, takvim } = createSeed()
     const aktif = new Set(mukellef.filter((m) => m.aktif).map((m) => m.id))
-    const baglilar = new Set(nilvera.map((b) => b.mukellefId))
-    expect(nilvera.every((b) => aktif.has(b.mukellefId))).toBe(true)
-    expect(nilvera.filter((b) => b.durum === "HATA")).toHaveLength(2)
+    const baglilar = new Set(baglanti.map((b) => b.mukellefId))
+    expect(baglanti.every((b) => aktif.has(b.mukellefId))).toBe(true)
+    expect(baglanti.filter((b) => b.durum === "HATA")).toHaveLength(2)
     expect(ebelge.every((e) => baglilar.has(e.mukellefId))).toBe(true)
     expect(new Set(ebelge.map((e) => e.ettn)).size).toBe(ebelge.length)
     for (const e of ebelge) {
@@ -121,5 +122,44 @@ describe("createSeed", () => {
     )
     for (const b of berat)
       if (onayli.has(b.id)) expect(b.durum).toBe("ONAYLANDI")
+  })
+
+  it("tahsilat: ücretli mükellefler, tutarlı kapatmalar ve her kesinti durumu", () => {
+    const { mukellef, cari, kesinti } = createSeed()
+    const ucretli = mukellef.filter((m) => m.ucret)
+    expect(ucretli.length).toBeGreaterThan(25)
+    const borclar = new Map(
+      cari.filter((h) => h.tip === "BORC").map((h) => [h.id, h])
+    )
+    const kapatilan = new Map<string, number>()
+    for (const h of cari) {
+      if (h.tip !== "ODEME") continue
+      expect(h.tarih <= "2026-09-22").toBe(true)
+      const toplam = (h.kapatmalar ?? []).reduce((t, k) => t + k.tutar, 0)
+      expect(toplam).toBeLessThanOrEqual(h.tutar + 0.005)
+      for (const k of h.kapatmalar ?? []) {
+        expect(borclar.get(k.borcId)?.mukellefId).toBe(h.mukellefId)
+        kapatilan.set(k.borcId, (kapatilan.get(k.borcId) ?? 0) + k.tutar)
+      }
+    }
+    for (const [id, t] of kapatilan)
+      expect(t).toBeLessThanOrEqual(borclar.get(id)!.tutar + 0.005)
+    // Otomatik ücret anahtarları benzersiz
+    const anahtarlar = cari.flatMap((h) => h.otomatikAnahtar ?? [])
+    expect(new Set(anahtarlar).size).toBe(anahtarlar.length)
+
+    const state = createSeed()
+    const durumlar = new Set(
+      kesintiKarsilastir(state.cari, state.mukellef, kesinti, 2026).map(
+        (s) => s.durum
+      )
+    )
+    expect([...durumlar].sort()).toEqual([
+      "BILDIRILMEMIS",
+      "EKSIK",
+      "ESLESTI",
+      "FAZLA",
+      "KAYITSIZ",
+    ])
   })
 })

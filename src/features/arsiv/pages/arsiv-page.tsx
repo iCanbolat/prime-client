@@ -3,12 +3,14 @@ import { Link } from "react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowRight01Icon,
+  Cancel01Icon,
   SidebarLeftIcon,
   Upload04Icon,
 } from "@hugeicons/core-free-icons"
 
 import { PageHeader } from "@/components/shared/page-header"
 import { ErrorState } from "@/components/shared/query-states"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -25,7 +27,10 @@ import {
   DosyaAlani,
 } from "@/features/arsiv/components/arsiv-gezgini"
 import { useDosyaIslemleri } from "@/features/arsiv/components/dosya-islemleri"
-import { EksikEvraklar } from "@/features/arsiv/components/eksik-evraklar"
+import {
+  EksikEvrakOzeti,
+  EksikEvraklar,
+} from "@/features/arsiv/components/eksik-evraklar"
 import {
   YukleDialog,
   type YukleHedef,
@@ -35,7 +40,10 @@ import {
   type TalepHedef,
 } from "@/features/evrak-talebi/components/talep-olustur-dialog"
 import { kategorilerdenIstenen } from "@/features/evrak-talebi/sabitler"
-import { useArsivParams } from "@/features/arsiv/hooks/use-arsiv-params"
+import {
+  GECERLILIK_FILTRE_ETIKET,
+  useArsivParams,
+} from "@/features/arsiv/hooks/use-arsiv-params"
 import { useArsivAgac } from "@/features/arsiv/queries"
 import { ARSIV_KATEGORI_ETIKET } from "@/types/domain"
 
@@ -57,6 +65,7 @@ export function ArsivPage() {
       mukellef: s.mukellef ?? null,
       kategori: s.kategori ?? null,
       cop: s.cop || null,
+      eksik: null,
     })
     setKlasorlerAcik(false)
   }
@@ -156,7 +165,40 @@ export function ArsivPage() {
               ) : (
                 <span className="font-medium">Tüm dosyalar</span>
               )}
+              {params.gecerlilik && !params.cop && (
+                <Badge
+                  variant="secondary"
+                  render={
+                    <button
+                      type="button"
+                      aria-label={`${GECERLILIK_FILTRE_ETIKET[params.gecerlilik]} filtresini kaldır`}
+                      onClick={() => update({ gecerlilik: null })}
+                    />
+                  }
+                  className="ml-1 gap-1 bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                >
+                  {GECERLILIK_FILTRE_ETIKET[params.gecerlilik]}
+                  <HugeiconsIcon
+                    icon={Cancel01Icon}
+                    strokeWidth={2}
+                    className="size-3"
+                  />
+                </Badge>
+              )}
             </nav>
+
+            {params.eksik && !mukellef && !params.cop && agac.data && (
+              <EksikEvrakOzeti
+                mukellefler={agac.data.mukellefler}
+                onAc={(id) => onSec({ mukellef: id, cop: false })}
+                onEvrakIste={(mukellefId, kategoriler) =>
+                  setTalepHedef({
+                    mukellefId,
+                    istenenler: kategorilerdenIstenen(kategoriler),
+                  })
+                }
+              />
+            )}
 
             {mukellef && !params.kategori && (
               <EksikEvraklar

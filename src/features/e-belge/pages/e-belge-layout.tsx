@@ -12,6 +12,7 @@ const SEKMELER = [
   { to: "e-fatura", label: "e-Fatura" },
   { to: "e-arsiv", label: "e-Arşiv" },
   { to: "e-defter", label: "e-Defter" },
+  { to: "kontor", label: "Kontör" },
   { to: "baglantilar", label: "Bağlantılar" },
 ] as const
 
@@ -25,7 +26,8 @@ export function EBelgeLayout() {
         title="e-Belge"
         description={
           <>
-            Nilvera üzerinden e-Fatura, e-Arşiv ve e-Defter berat takibi
+            Luca e-Entegratör üzerinden e-Fatura, e-Arşiv ve e-Defter berat
+            takibi
             {sonSenkron && (
               <>
                 {" · "}Son senkron{" "}
@@ -43,12 +45,28 @@ export function EBelgeLayout() {
       {ozet.data && ozet.data.baglantiHatasi > 0 && (
         <Alert variant="destructive">
           <AlertTitle>
-            {ozet.data.baglantiHatasi} mükellefin Nilvera bağlantısı hatalı
+            {ozet.data.baglantiHatasi} mükellefin Luca bağlantısı hatalı
           </AlertTitle>
           <AlertDescription>
             Bu mükelleflerin faturaları senkronize edilemiyor.{" "}
             <Link to="baglantilar?durum=HATA" className="underline">
               Bağlantıları görüntüle
+            </Link>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {ozet.data?.kontorDusuk && (
+        <Alert variant="destructive">
+          <AlertTitle>
+            {ozet.data.kontorKalan <= 0
+              ? "Luca kontörü bitti"
+              : `Luca kontörü azalıyor: ${ozet.data.kontorKalan.toLocaleString("tr-TR")} kaldı`}
+          </AlertTitle>
+          <AlertDescription>
+            Kontör bitince e-belge gönderilemez ve alınamaz.{" "}
+            <Link to="kontor" className="underline">
+              Kontör durumunu görüntüle
             </Link>
           </AlertDescription>
         </Alert>

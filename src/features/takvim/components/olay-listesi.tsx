@@ -88,7 +88,7 @@ export function DurumSecici({ olay }: { olay: TakvimOlayi }) {
   )
 }
 
-function OlaySatiri({
+export function OlaySatiri({
   olay,
   gosterMukellef,
   personelAdi,

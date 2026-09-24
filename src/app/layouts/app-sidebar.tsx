@@ -21,10 +21,14 @@ import {
 import { UserMenu } from "@/app/layouts/user-menu"
 import { useEBelgeOzet } from "@/features/e-belge/queries"
 import { useGelenSayac } from "@/features/evrak-talebi/queries"
+import { useFisSayac } from "@/features/fis-aktarimi/queries"
+import { useTebligatOzet } from "@/features/tebligat/queries"
 
 const SAYAC_ETIKET = {
   gelenEvrak: "inceleme bekleyen evrak",
   yanitBekleyen: "yanıt bekleyen fatura",
+  acikTebligat: "açık e-Tebligat",
+  fisTaslak: "onay bekleyen fiş",
 } as const
 
 export function AppSidebar() {
@@ -32,7 +36,11 @@ export function AppSidebar() {
   const { data: buro } = useBuro()
   const gelen = useGelenSayac()
   const eBelge = useEBelgeOzet()
+  const tebligat = useTebligatOzet()
+  const fis = useFisSayac()
   const sayaclar = {
+    fisTaslak: fis.data?.taslak ?? 0,
+    acikTebligat: tebligat.data?.acik ?? 0,
     gelenEvrak: gelen.data?.bekleyen ?? 0,
     yanitBekleyen: eBelge.data?.yanitBekleyen ?? 0,
   }
@@ -80,7 +88,7 @@ export function AppSidebar() {
                     {item.sayac && sayaclar[item.sayac] > 0 && (
                       <SidebarMenuBadge
                         aria-label={`${sayaclar[item.sayac]} ${SAYAC_ETIKET[item.sayac]}`}
-                        className="bg-primary text-primary-foreground peer-data-active/menu-button:text-primary-foreground"
+                        className="bg-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-active/menu-button:text-primary-foreground"
                       >
                         {sayaclar[item.sayac]}
                       </SidebarMenuBadge>

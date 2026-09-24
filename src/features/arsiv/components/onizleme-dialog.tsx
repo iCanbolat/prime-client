@@ -75,7 +75,8 @@ function useBlobUrl(dataUrl: string | undefined) {
   return url
 }
 
-function Icerik({ dosya }: { dosya: OnizlenecekDosya }) {
+/** Dosya içeriği (PDF iframe'i ya da görsel) ve indirme bağlantısı; pencere dışında da kullanılır */
+export function DosyaIcerigi({ dosya }: { dosya: OnizlenecekDosya }) {
   const icerik = useDosyaIcerik(dosya)
   const dataUrl = icerik.data?.dataUrl
   const blobUrl = useBlobUrl(dataUrl)
@@ -155,7 +156,7 @@ export function OnizlemeDialog({
               <DialogTitle className="truncate pr-8">{dosya.ad}</DialogTitle>
               <DialogDescription>{dosya.aciklama}</DialogDescription>
             </DialogHeader>
-            <Icerik key={`${dosya.kaynak}:${dosya.id}`} dosya={dosya} />
+            <DosyaIcerigi key={`${dosya.kaynak}:${dosya.id}`} dosya={dosya} />
           </>
         )}
       </DialogContent>

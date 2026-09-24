@@ -20,6 +20,7 @@ import {
   requireActor,
   turkishIncludes,
 } from "@/mocks/handlers/common"
+import { okumaKuyrugaAl } from "@/mocks/handlers/fis-aktarimi"
 import { placeholderIcerik } from "@/mocks/placeholder"
 import type {
   GelenEvrakView,
@@ -40,7 +41,7 @@ import type {
   TalepKanal,
 } from "@/types/domain"
 
-const KANALLAR: TalepKanal[] = ["WHATSAPP", "SMS", "LINK"]
+const KANALLAR: TalepKanal[] = ["WHATSAPP", "EPOSTA", "LINK"]
 const DONEM_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
 const MAKS_GUN = 60
@@ -61,6 +62,7 @@ export function talepView(t: EvrakTalebi): TalepView {
     durum: talepDurumu(t),
     mukellefUnvan: m?.unvan ?? "",
     mukellefTelefon: m?.telefon ?? "",
+    mukellefEposta: m?.eposta ?? "",
     olusturan: p ? { id: p.id, ad: p.ad, soyad: p.soyad, renk: p.renk } : null,
     yuklemeSayisi: gelenler.length,
     bekleyenSayisi: gelenler.filter((g) => g.durum === "BEKLIYOR").length,
@@ -342,13 +344,16 @@ export const evrakTalebiHandlers = [
         silindi: false,
       })
       await putBlob(dosya.id, (await getBlob(g.id)) ?? placeholderIcerik(g))
-      const guncel = db.gelen.update(g.id, {
+      let guncel = db.gelen.update(g.id, {
         durum: "ONAYLANDI",
         arsivDosyaId: dosya.id,
         inceleyenId: actor.id,
         incelemeTarihi: simdi,
         redNedeni: undefined,
       })!
+      // Fiş / ekstre ise okunup muhasebe fişi taslağına dönüşür (Fiş aktarımı)
+      const okuma = okumaKuyrugaAl(guncel)
+      if (okuma) guncel = db.gelen.update(g.id, { okumaId: okuma.id })!
       logActivity({
         aktorId: actor.id,
         eylem: "EVRAK_ONAYLANDI",

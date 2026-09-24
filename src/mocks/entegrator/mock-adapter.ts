@@ -1,5 +1,5 @@
 /**
- * `NilveraAdapter`'ın geliştirme / test uygulaması. Gerçek Nilvera'yı taklit eder:
+ * `EntegratorAdapter`'ın geliştirme / test uygulaması. Gerçek Luca'yı taklit eder:
  * - Anahtar doğrulama: en az 16 karakter; "hatali" içeren anahtar reddedilir (demo/test için).
  * - Artımlı senkron: her çağrıda mükellefe 0–2 (ortalama 0,75) yeni gelen e-Fatura "düşer" (adet mevcut fatura
  *   sayısından deterministik), işlenmekte olan giden faturalar GİB'den başarılı döner.
@@ -9,25 +9,16 @@
 import { Faker, base, en, tr } from "@faker-js/faker"
 
 import type {
-  NilveraAdapter,
-  NilveraFatura,
-  NilveraKimlik,
-} from "@/features/e-belge/nilvera-adapter"
+  EntegratorAdapter,
+  EntegratorFatura,
+  EntegratorKimlik,
+} from "@/features/e-belge/entegrator-adapter"
 import { toYmd } from "@/lib/tarih"
 import { db } from "@/mocks/db"
 import { belgeNo, faturaUret } from "@/mocks/factories/e-belge"
+import { karma } from "@/mocks/karma"
 import { placeholderIcerik } from "@/mocks/placeholder"
 import type { EBelgeKalem } from "@/types/api"
-
-/** Deterministik 32 bit karma (FNV-1a) */
-export function karma(metin: string): number {
-  let h = 0x811c9dc5
-  for (let i = 0; i < metin.length; i++) {
-    h ^= metin.charCodeAt(i)
-    h = Math.imul(h, 0x01000193)
-  }
-  return h >>> 0
-}
 
 function tohumluFaker(tohum: string) {
   const faker = new Faker({ locale: [tr, en, base] })
@@ -48,13 +39,13 @@ const HIZMETLER: [string, string][] = [
 
 const bekle = () => Promise.resolve()
 
-export const mockNilveraAdapter: NilveraAdapter = {
+export const mockEntegratorAdapter: EntegratorAdapter = {
   async baglantiDogrula({ apiAnahtari, mukellefId }) {
     await bekle()
     if (apiAnahtari.length < 16 || /hatali/i.test(apiAnahtari))
       return {
         gecerli: false,
-        hataMesaji: "Nilvera API anahtarı doğrulanamadı (401)",
+        hataMesaji: "Luca web servis anahtarı doğrulanamadı (401)",
         eFatura: false,
         eArsiv: false,
         eDefter: false,
@@ -83,7 +74,7 @@ export const mockNilveraAdapter: NilveraAdapter = {
           (e) =>
             e.yon === "GIDEN" && e.tur === tur && e.gibDurumu === "ISLENIYOR"
         )
-        .map((e): NilveraFatura => ({
+        .map((e): EntegratorFatura => ({
           ...e,
           yanit: undefined,
           gibDurumu: "BASARILI",
@@ -110,7 +101,7 @@ export const mockNilveraAdapter: NilveraAdapter = {
     })
   },
 
-  async faturaKalemleri(_kimlik: NilveraKimlik, ettn: string) {
+  async faturaKalemleri(_kimlik: EntegratorKimlik, ettn: string) {
     await bekle()
     const fatura = db.ebelge.where((e) => e.ettn === ettn)[0]
     if (!fatura) return []

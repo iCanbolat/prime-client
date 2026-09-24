@@ -223,7 +223,7 @@ function KimlikAdimi({ register, control, errors }: StepProps) {
 
 // --- Adım 2 ------------------------------------------------------------------
 
-function IletisimAdimi({ register, errors }: StepProps) {
+function IletisimAdimi({ register, control, errors }: StepProps) {
   return (
     <FieldGroup>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -231,7 +231,7 @@ function IletisimAdimi({ register, errors }: StepProps) {
           name="telefon"
           label="Telefon (WhatsApp)"
           errors={errors}
-          description="Evrak talepleri bu numaraya gönderilir."
+          description="WhatsApp mesajları bu numaraya gönderilir."
         >
           <Input
             {...register("telefon")}
@@ -248,6 +248,31 @@ function IletisimAdimi({ register, errors }: StepProps) {
           />
         </FormAlani>
       </div>
+      <Field>
+        <FieldLabel htmlFor="tercih-kanal-etiket">Mesaj kanalı</FieldLabel>
+        <Controller
+          control={control}
+          name="tercihKanal"
+          render={({ field }) => (
+            <Select
+              items={{ WHATSAPP: "WhatsApp", EPOSTA: "E-posta" }}
+              value={field.value}
+              onValueChange={(v) => v && field.onChange(v)}
+            >
+              <SelectTrigger id="tercih-kanal-etiket" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="WHATSAPP">WhatsApp</SelectItem>
+                <SelectItem value="EPOSTA">E-posta</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
+        <FieldDescription>
+          Tahakkuk ve borç hatırlatma gibi toplu gönderimlerde kullanılır.
+        </FieldDescription>
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <FormAlani name="il" label="İl" errors={errors}>
           <Input {...register("il")} {...inputProps("il", errors)} />

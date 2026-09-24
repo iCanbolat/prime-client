@@ -9,6 +9,10 @@ const TABS: { to: string; label: string; roles?: Rol[] }[] = [
   { to: "buro", label: "Büro" },
   { to: "personel", label: "Personel", roles: ["YONETICI"] },
   { to: "sablonlar", label: "Mesaj Şablonları", roles: ["YONETICI"] },
+  { to: "kanallar", label: "Kanallar", roles: ["YONETICI"] },
+  { to: "luca", label: "Luca Aktarımı", roles: ["YONETICI"] },
+  { to: "bildirimler", label: "Bildirimlerim" },
+  { to: "gonderimler", label: "Gönderim Geçmişi", roles: ["YONETICI"] },
   { to: "gelistirici", label: "Geliştirici" },
 ]
 
@@ -20,7 +24,7 @@ export function AyarlarLayout() {
     <>
       <PageHeader
         title="Ayarlar"
-        description="Büro bilgileri, personel ve uygulama tercihleri"
+        description="Büro bilgileri, personel, gönderim kanalları ve uygulama tercihleri"
       />
       <nav
         aria-label="Ayarlar bölümleri"

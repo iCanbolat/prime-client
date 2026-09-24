@@ -43,13 +43,15 @@ import {
   ORTAM_ETIKET,
 } from "@/features/e-belge/sabitler"
 import { formatDateTime } from "@/lib/format"
-import type { NilveraBaglantiView } from "@/types/api"
-import type { NilveraBaglantiDurumu } from "@/types/domain"
+import type { EntegratorBaglantiView } from "@/types/api"
+import type { EntegratorBaglantiDurumu } from "@/types/domain"
 
-const DURUMLAR = Object.keys(BAGLANTI_DURUM_ETIKET) as NilveraBaglantiDurumu[]
+const DURUMLAR = Object.keys(
+  BAGLANTI_DURUM_ETIKET
+) as EntegratorBaglantiDurumu[]
 const TUMU = "TUMU"
 
-function Servisler({ b }: { b: NilveraBaglantiView }) {
+function Servisler({ b }: { b: EntegratorBaglantiView }) {
   const servisler = [
     b.eFatura && "e-Fatura",
     b.eArsiv && "e-Arşiv",
@@ -67,15 +69,18 @@ export function BaglantilarPage() {
   const kaldir = useBaglantiKaldir()
   const senkron = useSenkron()
   const [searchParams, setSearchParams] = useSearchParams()
-  const durumParam = searchParams.get("durum") as NilveraBaglantiDurumu | null
+  const durumParam = searchParams.get(
+    "durum"
+  ) as EntegratorBaglantiDurumu | null
   const durum = durumParam && DURUMLAR.includes(durumParam) ? durumParam : null
-  const [duzenlenen, setDuzenlenen] = useState<NilveraBaglantiView | null>(null)
-  const [kaldirilacak, setKaldirilacak] = useState<NilveraBaglantiView | null>(
+  const [duzenlenen, setDuzenlenen] = useState<EntegratorBaglantiView | null>(
     null
   )
+  const [kaldirilacak, setKaldirilacak] =
+    useState<EntegratorBaglantiView | null>(null)
 
   const sayilar = useMemo(() => {
-    const s: Record<NilveraBaglantiDurumu, number> = {
+    const s: Record<EntegratorBaglantiDurumu, number> = {
       BAGLI: 0,
       HATA: 0,
       BAGLI_DEGIL: 0,
@@ -97,7 +102,7 @@ export function BaglantilarPage() {
     )
   if (baglantilar.isPending) return <LoadingState />
 
-  const mukellefiSenkronizeEt = (b: NilveraBaglantiView) =>
+  const mukellefiSenkronizeEt = (b: EntegratorBaglantiView) =>
     senkron.mutate(
       { mukellefId: b.mukellefId },
       {
@@ -144,7 +149,7 @@ export function BaglantilarPage() {
         <EmptyState icon={PlugSocketIcon} title="Bu durumda mükellef yok" />
       ) : (
         <div className="overflow-x-auto rounded-3xl border">
-          <Table aria-label="Nilvera bağlantıları">
+          <Table aria-label="Luca bağlantıları">
             <TableHeader>
               <TableRow>
                 <TableHead>Mükellef</TableHead>
@@ -196,7 +201,7 @@ export function BaglantilarPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        aria-label={`${b.mukellefUnvan} Nilvera'ya bağla`}
+                        aria-label={`${b.mukellefUnvan} Luca'ya bağla`}
                         onClick={() => setDuzenlenen(b)}
                       >
                         <HugeiconsIcon
@@ -262,8 +267,8 @@ export function BaglantilarPage() {
       <ConfirmDialog
         open={kaldirilacak !== null}
         onOpenChange={(open) => !open && setKaldirilacak(null)}
-        title="Nilvera bağlantısı kaldırılsın mı?"
-        description={`${kaldirilacak?.mukellefUnvan ?? ""} için API anahtarı silinir ve senkron durur. Senkronize edilmiş faturalar korunur.`}
+        title="Luca bağlantısı kaldırılsın mı?"
+        description={`${kaldirilacak?.mukellefUnvan ?? ""} için web servis anahtarı silinir ve senkron durur. Senkronize edilmiş faturalar korunur.`}
         confirmLabel="Kaldır"
         destructive
         pending={kaldir.isPending}

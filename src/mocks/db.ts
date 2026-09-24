@@ -17,15 +17,33 @@ import type {
   Buro,
   Credential,
   KasaMeta,
+  KontorAlim,
+  Mizan,
   Mukellef,
-  NilveraBaglanti,
+  EntegratorBaglanti,
   Personel,
+  PersonelKimlik,
   TakvimDurumKaydi,
+  Tahakkuk,
+  CariHareket,
+  KesintiIceAktarim,
+  KesintiKaydi,
+  Tebligat,
+  TebligatPostaKutusu,
+  BildirimTercihi,
+  Gonderim,
+  KanalAyari,
+  BelgeOkuma,
+  MuhasebeFisi,
+  FisHesapAyari,
+  LucaAktarim,
 } from "@/types/domain"
 
 export interface DbState {
   buro: Buro[]
   personel: Personel[]
+  /** Personel giriş şifresi özetleri (id = personelId); API yanıtlarına eklenmez */
+  kimlik: PersonelKimlik[]
   mukellef: Mukellef[]
   aktivite: AktiviteLog[]
   /** Şifreli kasa kayıtları. Seed'de boştur; ilk kasa isteğinde `ensureVault()` doldurur. */
@@ -41,21 +59,51 @@ export interface DbState {
   gelen: GelenEvrak[]
   /** Büro içi görevler */
   gorev: Gorev[]
-  /** Mükellef başına Nilvera bağlantısı (API anahtarı burada da tutulmaz) */
-  nilvera: NilveraBaglanti[]
-  /** Nilvera'dan senkronize edilen e-Fatura / e-Arşiv başlıkları */
+  /** Mükellef başına Luca bağlantısı (web servis anahtarı burada da tutulmaz) */
+  baglanti: EntegratorBaglanti[]
+  /** Luca'dan senkronize edilen e-Fatura / e-Arşiv başlıkları */
   ebelge: EBelge[]
   /** e-Defter berat durumları */
   berat: EDefterBerat[]
+  /** Büronun Luca kontör alımları (tüketim e-belgelerden hesaplanır) */
+  kontor: KontorAlim[]
+  /** İçe aktarılan tahakkuk fişleri */
+  tahakkuk: Tahakkuk[]
+  /** İçe aktarılan mizanlar */
+  mizan: Mizan[]
   /** Uygulama içi bildirimler (aktivite ve hatırlatmalardan üretilir) */
   bildirim: Bildirim[]
+  /** Büronun mükelleflerle cari hesabı (ücret borçları, tahsilatlar) */
+  cari: CariHareket[]
+  /** İVD kesinti listesi içe aktarımları (yıl başına bir kayıt) */
+  kesintiAktarim: KesintiIceAktarim[]
+  kesinti: KesintiKaydi[]
+  /** e-Tebligat kayıtları (posta kutusu taramasından veya elle) */
+  tebligat: Tebligat[]
+  /** Tebligat bildirimlerinin okunduğu IMAP kutusu (şifre burada da tutulmaz) */
+  postaKutusu: TebligatPostaKutusu[]
+  /** Büronun dış gönderim kanalları (gizli alanlar burada da tutulmaz) */
+  kanal: KanalAyari[]
+  /** Personel bildirim kanal tercihleri (id = personelId) */
+  bildirimTercihi: BildirimTercihi[]
+  /** Dış kanal gönderim kayıtları (outbox) */
+  gonderim: Gonderim[]
+  /** Onaylanan fiş / ekstrelerin okunması */
+  okuma: BelgeOkuma[]
+  /** Okumadan üretilen muhasebe fişleri (Luca'ya aktarılır) */
+  fis: MuhasebeFisi[]
+  /** Mükellef başına varsayılan hesaplar ve öğrenilen eşlemeler (id = mukellefId) */
+  fisHesapAyari: FisHesapAyari[]
+  /** İndirilen Luca Excel dosyaları */
+  lucaAktarim: LucaAktarim[]
 }
 
-export const STORAGE_KEY = "prime-ofis:db:v8"
+export const STORAGE_KEY = "prime-ofis:db:v12"
 
 const ID_PREFIX: Record<keyof DbState, string> = {
   buro: "b",
   personel: "p",
+  kimlik: "pw",
   mukellef: "m",
   aktivite: "a",
   credential: "c",
@@ -65,10 +113,25 @@ const ID_PREFIX: Record<keyof DbState, string> = {
   talep: "e",
   gelen: "g",
   gorev: "o",
-  nilvera: "n",
+  baglanti: "n",
   ebelge: "f",
   berat: "r",
+  kontor: "u",
+  tahakkuk: "h",
+  mizan: "z",
   bildirim: "i",
+  cari: "ch",
+  kesintiAktarim: "ki",
+  kesinti: "ks",
+  tebligat: "tb",
+  postaKutusu: "pk",
+  kanal: "kn",
+  bildirimTercihi: "bt",
+  gonderim: "gn",
+  okuma: "ok",
+  fis: "mf",
+  fisHesapAyari: "fh",
+  lucaAktarim: "la",
 }
 
 let state: DbState | null = null
@@ -143,6 +206,17 @@ function collection<K extends keyof DbState>(key: K) {
       commit([...rows(), row])
       return row
     },
+    /** Tek yazmayla toplu ekleme (her `insert` tüm DB'yi localStorage'a yazar) */
+    insertMany: (
+      inputs: (Omit<Row<K>, "id"> & { id?: string })[]
+    ): Row<K>[] => {
+      const eklenen = inputs.map(
+        (input) =>
+          ({ ...input, id: input.id ?? newId(ID_PREFIX[key]) }) as Row<K>
+      )
+      if (eklenen.length) commit([...rows(), ...eklenen])
+      return eklenen
+    },
     update: (
       id: string,
       patch: Partial<Omit<Row<K>, "id">>
@@ -170,6 +244,7 @@ function collection<K extends keyof DbState>(key: K) {
 export const db = {
   buro: collection("buro"),
   personel: collection("personel"),
+  kimlik: collection("kimlik"),
   mukellef: collection("mukellef"),
   aktivite: collection("aktivite"),
   credential: collection("credential"),
@@ -179,10 +254,25 @@ export const db = {
   talep: collection("talep"),
   gelen: collection("gelen"),
   gorev: collection("gorev"),
-  nilvera: collection("nilvera"),
+  baglanti: collection("baglanti"),
   ebelge: collection("ebelge"),
   berat: collection("berat"),
+  kontor: collection("kontor"),
+  tahakkuk: collection("tahakkuk"),
+  mizan: collection("mizan"),
   bildirim: collection("bildirim"),
+  cari: collection("cari"),
+  kesintiAktarim: collection("kesintiAktarim"),
+  kesinti: collection("kesinti"),
+  tebligat: collection("tebligat"),
+  postaKutusu: collection("postaKutusu"),
+  kanal: collection("kanal"),
+  bildirimTercihi: collection("bildirimTercihi"),
+  gonderim: collection("gonderim"),
+  okuma: collection("okuma"),
+  fis: collection("fis"),
+  fisHesapAyari: collection("fisHesapAyari"),
+  lucaAktarim: collection("lucaAktarim"),
 }
 
 /** Veritabanını seed'e sıfırlar (Ayarlar → Geliştirici ve testler). */

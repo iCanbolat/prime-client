@@ -75,7 +75,7 @@ describe("evrak talepleri", () => {
       http.post("/evrak-talepleri", {
         mukellefId: "m_sahis",
         istenenler: [],
-        kanal: "SMS",
+        kanal: "EPOSTA",
         gecerlilikGun: 7,
       })
     ).rejects.toMatchObject({ status: 400 })
@@ -83,13 +83,17 @@ describe("evrak talepleri", () => {
 
   it("gönderim kaydedilir; süresi dolmuş talep gönderilemez ama uzatılabilir", async () => {
     const g = await http.post<TalepView>("/evrak-talepleri/e_aktif/gonderim", {
-      kanal: "SMS",
+      kanal: "EPOSTA",
     })
     expect(g.gonderimler).toHaveLength(2)
-    expect(g.kanal).toBe("SMS")
+    expect(g.kanal).toBe("EPOSTA")
+    // SMS kanalı kaldırıldı
+    await expect(
+      http.post("/evrak-talepleri/e_aktif/gonderim", { kanal: "SMS" })
+    ).rejects.toMatchObject({ status: 400 })
 
     await expect(
-      http.post("/evrak-talepleri/e_sure/gonderim", { kanal: "SMS" })
+      http.post("/evrak-talepleri/e_sure/gonderim", { kanal: "EPOSTA" })
     ).rejects.toMatchObject({ status: 409 })
     const uzatilan = await http.post<TalepView>(
       "/evrak-talepleri/e_sure/uzat",
@@ -234,6 +238,13 @@ describe("gelen evrak incelemesi", () => {
       http.put("/buro/sablonlar", { ...yeni, RED: "link yok" })
     ).rejects.toMatchObject({ status: 400 })
     await http.put("/buro/sablonlar", yeni)
-    expect(db.buro.all()[0]!.mesajSablonlari).toEqual(yeni)
+    // Gönderilmeyen şablon türleri (TAHAKKUK, BORC_HATIRLATMA) korunur
+    expect(db.buro.all()[0]!.mesajSablonlari).toMatchObject(yeni)
+    expect(db.buro.all()[0]!.mesajSablonlari.BORC_HATIRLATMA).toContain(
+      "{bakiye}"
+    )
+    await expect(
+      http.put("/buro/sablonlar", { ...yeni, BORC_HATIRLATMA: "Borcunuz var" })
+    ).rejects.toMatchObject({ status: 400 })
   })
 })

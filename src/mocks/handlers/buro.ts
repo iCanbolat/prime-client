@@ -1,5 +1,6 @@
 import { HttpResponse, http } from "msw"
 
+import { SABLON_TIPLERI, sablonHatasi } from "@/features/evrak-talebi/mesaj"
 import { db } from "@/mocks/db"
 import {
   api,
@@ -9,8 +10,6 @@ import {
   requireActor,
 } from "@/mocks/handlers/common"
 import type { MesajSablonlari } from "@/types/api"
-
-const MAKS_SABLON = 1000
 
 export const buroHandlers = [
   http.get(api("/buro"), () => {
@@ -32,24 +31,17 @@ export const buroHandlers = [
       if (!buro) return notFound("Büro bilgisi bulunamadı")
 
       const body = await request.json()
-      for (const tip of ["TALEP", "RED"] as const) {
-        const metin = body[tip]?.trim()
-        if (!metin) return errorResponse(400, "Şablon boş olamaz")
-        if (metin.length > MAKS_SABLON)
-          return errorResponse(
-            400,
-            `Şablon en fazla ${MAKS_SABLON} karakter olabilir`
-          )
-        if (!metin.includes("{link}"))
-          return errorResponse(400, "Şablon {link} değişkenini içermeli")
+      const sablonlar = { ...buro.mesajSablonlari }
+      for (const tip of SABLON_TIPLERI) {
+        // Eski istemciler yalnızca TALEP/RED gönderebilir; gönderilmeyen tür korunur
+        if (body[tip] === undefined && sablonlar[tip]) continue
+        const hata = sablonHatasi(tip, body[tip])
+        if (hata) return errorResponse(400, hata)
+        sablonlar[tip] = body[tip].trim()
       }
-      const guncel = db.buro.update(buro.id, {
-        mesajSablonlari: { TALEP: body.TALEP.trim(), RED: body.RED.trim() },
-      })!
+      const guncel = db.buro.update(buro.id, { mesajSablonlari: sablonlar })!
       logActivity({ aktorId: actor.id, eylem: "SABLON_GUNCELLENDI" })
       return HttpResponse.json(guncel)
     }
   ),
-
-  http.get(api("/personel"), () => HttpResponse.json(db.personel.all())),
 ]

@@ -1,5 +1,5 @@
 /**
- * `/api/e-belge/*` — backend'in e-Belge sözleşmesi. Nilvera'ya erişim `NilveraAdapter` üzerinden
+ * `/api/e-belge/*` — backend'in e-Belge sözleşmesi. Luca'ya erişim `EntegratorAdapter` üzerinden
  * (burada mock uygulaması) yapılır; gerçek backend aynı uçları kendi adaptörüyle karşılar.
  */
 import { format, subMonths } from "date-fns"
@@ -12,7 +12,13 @@ import {
   yanitlanabilirMi,
   YANIT_UYARI_GUN,
 } from "@/features/e-belge/kurallar"
-import type { NilveraKimlik } from "@/features/e-belge/nilvera-adapter"
+import type { EntegratorKimlik } from "@/features/e-belge/entegrator-adapter"
+import {
+  kontorBakiyesi,
+  mukellefTuketimleri,
+  sonDonemler,
+  donemTuketimi,
+} from "@/features/e-belge/kontor"
 import { SAYFA_BOYUTU } from "@/features/e-belge/sabitler"
 import { yukumlulukleriHesapla } from "@/features/takvim/motor"
 import { bugun } from "@/lib/tarih"
@@ -28,7 +34,7 @@ import {
   turkishIncludes,
 } from "@/mocks/handlers/common"
 import { beyanDurumuOku, beyanDurumuYaz } from "@/mocks/handlers/takvim"
-import { mockNilveraAdapter as adapter } from "@/mocks/nilvera/mock-adapter"
+import { mockEntegratorAdapter as adapter } from "@/mocks/entegrator/mock-adapter"
 import type {
   BaglantiKaydetRequest,
   BeratListResponse,
@@ -38,7 +44,10 @@ import type {
   EBelgeOzetResponse,
   EBelgeView,
   EFaturaYanitRequest,
-  NilveraBaglantiView,
+  EntegratorBaglantiView,
+  KontorAlimRequest,
+  KontorAlimView,
+  KontorOzetResponse,
   SenkronRequest,
   SenkronResponse,
 } from "@/types/api"
@@ -49,8 +58,8 @@ import type {
   EFaturaYanit,
   GibDurumu,
   Mukellef,
-  NilveraBaglanti,
-  NilveraOrtam,
+  EntegratorBaglanti,
+  EntegratorOrtam,
   Personel,
 } from "@/types/domain"
 
@@ -58,12 +67,13 @@ const TURLER: EBelgeTur[] = ["E_FATURA", "E_ARSIV"]
 const YONLER: EBelgeYon[] = ["GELEN", "GIDEN"]
 const GIB_DURUMLARI: GibDurumu[] = ["BASARILI", "ISLENIYOR", "HATA", "IPTAL"]
 const YANITLAR: EFaturaYanit[] = ["BEKLIYOR", "KABUL", "RED", "SURESI_DOLDU"]
-const ORTAMLAR: NilveraOrtam[] = ["TEST", "CANLI"]
+const ORTAMLAR: EntegratorOrtam[] = ["TEST", "CANLI"]
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+const DONEM_RE = /^\d{4}-(0[1-9]|1[0-2])$/
 
-function baglantiView(m: Mukellef): NilveraBaglantiView {
-  const kayit = db.nilvera.where((b) => b.mukellefId === m.id)[0]
-  const temel: NilveraBaglanti = kayit ?? {
+function baglantiView(m: Mukellef): EntegratorBaglantiView {
+  const kayit = db.baglanti.where((b) => b.mukellefId === m.id)[0]
+  const temel: EntegratorBaglanti = kayit ?? {
     id: `n_${m.id}`,
     mukellefId: m.id,
     durum: "BAGLI_DEGIL",
@@ -92,7 +102,7 @@ export function ebelgeView(e: EBelge, simdi = new Date()): EBelgeView {
 }
 
 /** Backend anahtarı KMS'ten çözer; mock'ta anahtar hiç saklanmadığı için yer tutucu kullanılır. */
-const kimlik = (b: NilveraBaglanti): NilveraKimlik => ({
+const kimlik = (b: EntegratorBaglanti): EntegratorKimlik => ({
   mukellefId: b.mukellefId,
   apiAnahtari: "<backend>",
   ortam: b.ortam,
@@ -108,7 +118,7 @@ export function beratDonemleri(bugunYmd = bugun()): string[] {
 }
 
 function eDefterBaglantilari(mukellefId?: string | null) {
-  return db.nilvera.where(
+  return db.baglanti.where(
     (b) =>
       b.eDefter &&
       b.durum !== "BAGLI_DEGIL" &&
@@ -164,7 +174,7 @@ interface SenkronSonucu {
 
 /** Tek mükellef için artımlı senkron: faturalar (ETTN ile upsert) ve beratlar. */
 async function mukellefiSenkronizeEt(
-  b: NilveraBaglanti,
+  b: EntegratorBaglanti,
   actor: Personel
 ): Promise<SenkronSonucu> {
   const sonuc: SenkronSonucu = {
@@ -208,12 +218,12 @@ async function mukellefiSenkronizeEt(
         // Takvim senkronu yalnızca ileri yönde: zaten onaylı beyana dokunulmaz
         const takvimId = beratTakvimId(b.mukellefId, berat.donem)
         if (beyanDurumuOku(takvimId) !== "ONAYLANDI")
-          beyanDurumuYaz(takvimId, "ONAYLANDI", actor, " (Nilvera berat)")
+          beyanDurumuYaz(takvimId, "ONAYLANDI", actor, " (Luca berat)")
       }
     }
   }
 
-  db.nilvera.update(b.id, { sonSenkron: new Date().toISOString() })
+  db.baglanti.update(b.id, { sonSenkron: new Date().toISOString() })
   return sonuc
 }
 
@@ -245,13 +255,13 @@ export const eBelgeHandlers = [
       if (actor.rol !== "YONETICI")
         return errorResponse(
           403,
-          "Nilvera bağlantısını yalnızca yönetici yönetebilir"
+          "Luca bağlantısını yalnızca yönetici yönetebilir"
         )
       const m = db.mukellef.find(params.mukellefId)
       if (!m) return notFound("Mükellef bulunamadı")
       const body = await request.json()
       const anahtar = body.apiAnahtari?.trim() ?? ""
-      if (!anahtar) return errorResponse(400, "API anahtarı zorunludur")
+      if (!anahtar) return errorResponse(400, "Web servis anahtarı zorunludur")
       if (!ORTAMLAR.includes(body.ortam))
         return errorResponse(400, "Geçersiz ortam")
 
@@ -263,11 +273,11 @@ export const eBelgeHandlers = [
       if (!dogrulama.gecerli)
         return errorResponse(
           422,
-          dogrulama.hataMesaji ?? "Nilvera bağlantısı doğrulanamadı"
+          dogrulama.hataMesaji ?? "Luca bağlantısı doğrulanamadı"
         )
 
       // Anahtarın kendisi saklanmaz (gerçek backend: KMS ile şifreli); yalnızca ipucu
-      const kayit: Omit<NilveraBaglanti, "id"> = {
+      const kayit: Omit<EntegratorBaglanti, "id"> = {
         mukellefId: m.id,
         durum: "BAGLI",
         ortam: body.ortam,
@@ -280,21 +290,21 @@ export const eBelgeHandlers = [
         baglayanId: actor.id,
         baglanmaTarihi: new Date().toISOString(),
       }
-      const mevcut = db.nilvera.where((b) => b.mukellefId === m.id)[0]
+      const mevcut = db.baglanti.where((b) => b.mukellefId === m.id)[0]
       if (mevcut)
-        db.nilvera.update(mevcut.id, {
+        db.baglanti.update(mevcut.id, {
           ...kayit,
           sonSenkron: mevcut.sonSenkron,
         })
-      else db.nilvera.insert({ id: `n_${m.id}`, ...kayit })
+      else db.baglanti.insert({ id: `n_${m.id}`, ...kayit })
 
       logActivity({
         aktorId: actor.id,
-        eylem: "NILVERA_BAGLANDI",
+        eylem: "ENTEGRATOR_BAGLANDI",
         hedefTip: "MUKELLEF",
         hedefId: m.id,
         mukellefId: m.id,
-        aciklama: `Nilvera (${body.ortam === "TEST" ? "test" : "canlı"})`,
+        aciklama: `Luca (${body.ortam === "TEST" ? "test" : "canlı"})`,
       })
       return HttpResponse.json(baglantiView(m))
     }
@@ -308,16 +318,16 @@ export const eBelgeHandlers = [
       if (actor.rol !== "YONETICI")
         return errorResponse(
           403,
-          "Nilvera bağlantısını yalnızca yönetici yönetebilir"
+          "Luca bağlantısını yalnızca yönetici yönetebilir"
         )
-      const mevcut = db.nilvera.where(
+      const mevcut = db.baglanti.where(
         (b) => b.mukellefId === params.mukellefId
       )[0]
       if (!mevcut) return notFound("Bağlantı bulunamadı")
-      db.nilvera.remove(mevcut.id)
+      db.baglanti.remove(mevcut.id)
       logActivity({
         aktorId: actor.id,
-        eylem: "NILVERA_BAGLANTI_KALDIRILDI",
+        eylem: "ENTEGRATOR_BAGLANTI_KALDIRILDI",
         hedefTip: "MUKELLEF",
         hedefId: mevcut.mukellefId,
         mukellefId: mevcut.mukellefId,
@@ -334,14 +344,14 @@ export const eBelgeHandlers = [
       if (actor instanceof Response) return actor
       const body = ((await request.json().catch(() => ({}))) ??
         {}) as SenkronRequest
-      const hedefler = db.nilvera.where(
+      const hedefler = db.baglanti.where(
         (b) =>
           b.durum !== "BAGLI_DEGIL" &&
           (!body.mukellefId || b.mukellefId === body.mukellefId) &&
           Boolean(db.mukellef.find(b.mukellefId)?.aktif)
       )
       if (body.mukellefId && hedefler.length === 0)
-        return errorResponse(409, "Mükellefin Nilvera bağlantısı yok")
+        return errorResponse(409, "Mükellefin Luca bağlantısı yok")
 
       const yanit: SenkronResponse = {
         mukellefSayisi: 0,
@@ -388,6 +398,7 @@ export const eBelgeHandlers = [
     const yon = p("yon") as EBelgeYon | null
     const gib = p("gibDurumu") as GibDurumu | null
     const yanitF = p("yanit") as EFaturaYanit | null
+    const yanitYaklasan = p("yanitYaklasan") === "true"
     const q = p("q")?.trim()
     const baslangic = p("baslangic")
     const bitis = p("bitis")
@@ -423,6 +434,9 @@ export const eBelgeHandlers = [
       .filter(
         (e) =>
           (!yanitF || e.yanit === yanitF) &&
+          (!yanitYaklasan ||
+            (e.yanit === "BEKLIYOR" &&
+              (e.yanitKalanGun ?? 99) <= YANIT_UYARI_GUN)) &&
           (!q ||
             turkishIncludes(e.belgeNo, q) ||
             turkishIncludes(e.karsiTaraf.unvan, q) ||
@@ -457,7 +471,7 @@ export const eBelgeHandlers = [
     async ({ params }) => {
       const e = db.ebelge.find(params.id)
       if (!e) return notFound("Fatura bulunamadı")
-      const b = db.nilvera.where((n) => n.mukellefId === e.mukellefId)[0]
+      const b = db.baglanti.where((n) => n.mukellefId === e.mukellefId)[0]
       const m = db.mukellef.find(e.mukellefId)
       const detay: EBelgeDetay = {
         ...ebelgeView(e),
@@ -473,8 +487,8 @@ export const eBelgeHandlers = [
     async ({ params }) => {
       const e = db.ebelge.find(params.id)
       if (!e) return notFound("Fatura bulunamadı")
-      const b = db.nilvera.where((n) => n.mukellefId === e.mukellefId)[0]
-      if (!b) return errorResponse(409, "Mükellefin Nilvera bağlantısı yok")
+      const b = db.baglanti.where((n) => n.mukellefId === e.mukellefId)[0]
+      if (!b) return errorResponse(409, "Mükellefin Luca bağlantısı yok")
       return HttpResponse.json({
         dataUrl: await adapter.faturaIcerik(kimlik(b), e.ettn, "PDF"),
         ad: `${e.belgeNo}.pdf`,
@@ -507,9 +521,9 @@ export const eBelgeHandlers = [
       const neden = body.neden?.trim()
       if (body.karar === "RED" && !neden)
         return errorResponse(400, "Red nedeni zorunludur")
-      const b = db.nilvera.where((n) => n.mukellefId === e.mukellefId)[0]
+      const b = db.baglanti.where((n) => n.mukellefId === e.mukellefId)[0]
       if (b?.durum !== "BAGLI")
-        return errorResponse(409, "Mükellefin Nilvera bağlantısı aktif değil")
+        return errorResponse(409, "Mükellefin Luca bağlantısı aktif değil")
 
       await adapter.ticariYanitGonder(kimlik(b), e.ettn, body.karar, neden)
       const guncel = db.ebelge.update(e.id, {
@@ -546,8 +560,8 @@ export const eBelgeHandlers = [
           { message: "Fatura zaten arşivde", arsivDosyaId: onceki.id },
           { status: 409 }
         )
-      const b = db.nilvera.where((n) => n.mukellefId === e.mukellefId)[0]
-      if (!b) return errorResponse(409, "Mükellefin Nilvera bağlantısı yok")
+      const b = db.baglanti.where((n) => n.mukellefId === e.mukellefId)[0]
+      if (!b) return errorResponse(409, "Mükellefin Luca bağlantısı yok")
 
       const icerik = await adapter.faturaIcerik(kimlik(b), e.ettn, "PDF")
       // "… A.Ş." ile biten unvanlarda çift nokta oluşmasın
@@ -594,11 +608,12 @@ export const eBelgeHandlers = [
       .where((e) => kapsamda(e.mukellefId))
       .map((e) => ebelgeView(e, simdi))
       .filter((e) => e.yanit === "BEKLIYOR")
-    const baglantilar = db.nilvera.where((b) => kapsamda(b.mukellefId))
+    const baglantilar = db.baglanti.where((b) => kapsamda(b.mukellefId))
     const senkronlar = baglantilar
       .map((b) => b.sonSenkron)
       .filter((s): s is string => Boolean(s))
       .sort()
+    const bakiye = kontorBakiyesi(db.kontor.all(), db.ebelge.all(), bugun())
     const ozet: EBelgeOzetResponse = {
       yanitBekleyen: bekleyen.length,
       yanitSuresiYaklasan: bekleyen
@@ -607,13 +622,98 @@ export const eBelgeHandlers = [
       hataliGonderim: db.ebelge.count(
         (e) => kapsamda(e.mukellefId) && e.gibDurumu === "HATA"
       ),
+      hataliEArsiv: db.ebelge.count(
+        (e) =>
+          kapsamda(e.mukellefId) &&
+          e.gibDurumu === "HATA" &&
+          e.tur === "E_ARSIV"
+      ),
       baglantiHatasi: baglantilar.filter((b) => b.durum === "HATA").length,
       bagliMukellef: baglantilar.filter((b) => b.durum === "BAGLI").length,
       beratGeciken: beratlariHesapla()
         .items.filter((b) => kapsamda(b.mukellefId))
         .filter((b) => b.durum !== "ONAYLANDI" && b.gecikti).length,
       sonSenkron: senkronlar.at(-1),
+      // Kontör havuzu büronundur: sorumlu filtresinden bağımsız
+      kontorKalan: bakiye.kalan,
+      kontorDusuk: bakiye.dusukBakiye,
     }
     return HttpResponse.json(ozet)
   }),
+
+  // --- Kontör -----------------------------------------------------------------
+  http.get(api("/e-belge/kontor"), ({ request }) => {
+    const bugunYmd = bugun()
+    const donemParam = new URL(request.url).searchParams.get("donem")
+    const donem =
+      donemParam && DONEM_RE.test(donemParam)
+        ? donemParam
+        : bugunYmd.slice(0, 7)
+    const belgeler = db.ebelge.all()
+    const bakiye = kontorBakiyesi(db.kontor.all(), belgeler, bugunYmd)
+    const yanit: KontorOzetResponse = {
+      donem,
+      ...bakiye,
+      aylik: sonDonemler(bugunYmd, 6).map((d) => ({
+        donem: d,
+        tuketim: donemTuketimi(belgeler, d),
+      })),
+      mukellefler: mukellefTuketimleri(belgeler, donem).map((s) => ({
+        ...s,
+        mukellefUnvan: db.mukellef.find(s.mukellefId)?.unvan ?? "—",
+        tutar: s.toplam * bakiye.birimMaliyet,
+      })),
+      alimlar: db.kontor
+        .all()
+        .sort((a, b) => b.tarih.localeCompare(a.tarih))
+        .map((a): KontorAlimView => {
+          const p = db.personel.find(a.ekleyenId)
+          return { ...a, ekleyenAd: p ? `${p.ad} ${p.soyad}` : "—" }
+        }),
+    }
+    return HttpResponse.json(yanit)
+  }),
+
+  http.post<never, KontorAlimRequest>(
+    api("/e-belge/kontor/alimlar"),
+    async ({ request }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      if (actor.rol !== "YONETICI")
+        return errorResponse(
+          403,
+          "Kontör alımını yalnızca yönetici kaydedebilir"
+        )
+      const body = await request.json()
+      const tamSayi = (n: unknown, min: number) =>
+        Number.isInteger(n) && (n as number) >= min
+      if (!YMD_RE.test(body.tarih ?? "") || body.tarih > bugun())
+        return errorResponse(400, "Geçersiz tarih")
+      if (!tamSayi(body.paketAdet, 1) || !tamSayi(body.hediyeAdet, 0))
+        return errorResponse(400, "Kontör adedi geçersiz")
+      if (typeof body.tutar !== "number" || !(body.tutar >= 0))
+        return errorResponse(400, "Tutar geçersiz")
+
+      const kayit = db.kontor.insert({
+        tarih: body.tarih,
+        paketAdet: body.paketAdet,
+        hediyeAdet: body.hediyeAdet,
+        tutar: body.tutar,
+        not: body.not?.trim() || undefined,
+        ekleyenId: actor.id,
+      })
+      logActivity({
+        aktorId: actor.id,
+        eylem: "KONTOR_ALINDI",
+        aciklama: `${kayit.paketAdet + kayit.hediyeAdet} kontör`,
+      })
+      return HttpResponse.json(
+        {
+          ...kayit,
+          ekleyenAd: `${actor.ad} ${actor.soyad}`,
+        } satisfies KontorAlimView,
+        { status: 201 }
+      )
+    }
+  ),
 ]

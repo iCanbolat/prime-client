@@ -39,6 +39,7 @@ export const mukellefFormSchema = z
       z.literal(""),
       z.email("Geçerli bir e-posta adresi giriniz"),
     ]),
+    tercihKanal: z.enum(["WHATSAPP", "EPOSTA"]),
     il: z.string().trim().min(2, zorunlu("İl")),
     ilce: z.string().trim().min(2, zorunlu("İlçe")),
     adres: z.string().trim().max(300, "En fazla 300 karakter"),
@@ -89,6 +90,9 @@ export const mukellefFormSchema = z
         "3 aylık KDV yalnızca işletme hesabı esasına tabi şahıslar içindir"
       )
     }
+    if (v.tercihKanal === "EPOSTA" && !v.eposta) {
+      issue("eposta", "E-posta tercih edildiyse adres zorunludur")
+    }
     if (v.calisanSayisi > 0 && !v.sgkIsyeriVar) {
       issue(
         "sgkIsyeriVar",
@@ -113,7 +117,10 @@ export const FORM_ADIMLARI = [
       "vergiDairesi",
     ],
   },
-  { baslik: "İletişim", alanlar: ["telefon", "eposta", "il", "ilce", "adres"] },
+  {
+    baslik: "İletişim",
+    alanlar: ["telefon", "eposta", "tercihKanal", "il", "ilce", "adres"],
+  },
   {
     baslik: "Vergi yükümlülükleri",
     alanlar: [
@@ -146,6 +153,7 @@ export const BOS_MUKELLEF_FORMU: MukellefFormValues = {
   vergiDairesi: "",
   telefon: "",
   eposta: "",
+  tercihKanal: "WHATSAPP",
   il: "İstanbul",
   ilce: "",
   adres: "",
@@ -173,6 +181,7 @@ export function mukellefToFormValues(m: Mukellef): MukellefFormValues {
     vergiDairesi: m.vergiDairesi,
     telefon: m.telefon,
     eposta: m.eposta,
+    tercihKanal: m.tercihKanal ?? "WHATSAPP",
     il: m.il,
     ilce: m.ilce,
     adres: m.adres,

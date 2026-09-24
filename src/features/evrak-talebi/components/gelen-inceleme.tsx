@@ -70,8 +70,16 @@ function OnaylaForm({
         gecerlilikTarihi: sureli ? gecerlilik || undefined : undefined,
       },
       {
-        onSuccess: () => {
-          toast.success("Evrak onaylandı ve arşive kaydedildi")
+        onSuccess: (sonuc) => {
+          toast.success(
+            "Evrak onaylandı ve arşive kaydedildi",
+            sonuc.okumaId
+              ? {
+                  description:
+                    "Belge okunuyor; fiş taslağı Fiş Aktarımı'nda hazırlanacak.",
+                }
+              : undefined
+          )
           onClose()
         },
         onError: (error) => toast.error(error.message),
@@ -325,6 +333,14 @@ export function GelenEvrakListesi({
                   className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                 >
                   Arşivde görüntüle
+                </Link>
+              )}
+              {g.durum === "ONAYLANDI" && g.okumaId && (
+                <Link
+                  to={`/fis-aktarimi/taslaklar?gelen=${g.id}`}
+                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  Muhasebe fişini aç
                 </Link>
               )}
             </div>

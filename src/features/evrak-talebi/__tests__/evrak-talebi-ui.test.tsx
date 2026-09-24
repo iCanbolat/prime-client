@@ -51,7 +51,7 @@ describe("Evrak talepleri sayfası", () => {
       name: "Onayla ve arşive kaydet",
     })
     expect(within(dialog).getByLabelText("Arşiv kategorisi")).toHaveTextContent(
-      "Diğer"
+      "Fatura"
     )
     await user.clear(within(dialog).getByLabelText("Arşivdeki adı"))
     await user.type(
@@ -67,8 +67,11 @@ describe("Evrak talepleri sayfası", () => {
     expect(
       db.arsiv.where((d) => d.ad === "Ağustos faturaları.pdf")
     ).toMatchObject([
-      { mukellefId: "m_ltd", kategori: "DIGER", yukleyenId: "p_2" },
+      { mukellefId: "m_ltd", kategori: "FATURA", yukleyenId: "p_2" },
     ])
+    // Bilanço mükellefinin fişi okunmak üzere kuyruğa alınır
+    expect(db.gelen.find("g_bekleyen")?.okumaId).toBe("ok_g_bekleyen")
+    expect(db.okuma.find("ok_g_bekleyen")?.durum).toBe("OKUNUYOR")
   })
 
   it("reddet → neden kaydedilir, talep yeniden açılır ve tekrar yükleme mesajı hazırlanır", async () => {

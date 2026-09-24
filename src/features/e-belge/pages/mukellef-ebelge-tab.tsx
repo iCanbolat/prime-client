@@ -59,10 +59,10 @@ export function MukellefEBelgeTab() {
       <>
         <EmptyState
           icon={PlugSocketIcon}
-          title="Nilvera bağlantısı yok"
+          title="Luca bağlantısı yok"
           description={
             yonetici
-              ? "Mükellefin Nilvera API anahtarıyla bağlanınca e-Fatura, e-Arşiv ve e-Defter berat durumları burada görünür."
+              ? "Mükellefin Luca web servis anahtarıyla bağlanınca e-Fatura, e-Arşiv ve e-Defter berat durumları burada görünür."
               : "Bağlantıyı büro yöneticisi kurabilir."
           }
           action={
@@ -73,7 +73,7 @@ export function MukellefEBelgeTab() {
                   strokeWidth={2}
                   data-icon="inline-start"
                 />
-                Nilvera'ya bağla
+                Luca'ya bağla
               </Button>
             )
           }
@@ -93,7 +93,7 @@ export function MukellefEBelgeTab() {
       <Card size="sm">
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">
-            Nilvera
+            Luca
             <BaglantiDurumBadge durum={b.durum} />
           </CardTitle>
           <CardDescription>
@@ -132,8 +132,8 @@ export function MukellefEBelgeTab() {
         <Alert variant="destructive">
           <AlertTitle>Bağlantı hatası</AlertTitle>
           <AlertDescription>
-            {b.hataMesaji ?? "Nilvera'ya bağlanılamıyor."} Aşağıdaki faturalar
-            son başarılı senkrona aittir.
+            {b.hataMesaji ?? "Luca'ya bağlanılamıyor."} Aşağıdaki faturalar son
+            başarılı senkrona aittir.
           </AlertDescription>
         </Alert>
       )}

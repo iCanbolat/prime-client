@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { http } from "@/lib/http"
 import { db } from "@/mocks/db"
+import { DEMO_GIRIS_SIFRESI } from "@/mocks/factories/personel"
 import type { LoginResponse, MukellefListResponse } from "@/types/api"
 
 describe("GET /api/mukellefler", () => {
@@ -64,6 +65,7 @@ describe("auth", () => {
   it("login personeli döner ve GIRIS aktivitesi yazar", async () => {
     const { personel } = await http.post<LoginResponse>("/auth/login", {
       personelId: "p_3",
+      sifre: DEMO_GIRIS_SIFRESI,
     })
     expect(personel.ad).toBe("Zeynep")
     expect(
@@ -71,13 +73,18 @@ describe("auth", () => {
     ).toHaveLength(1)
   })
 
-  it("bilinmeyen kullanıcı 404, pasif kullanıcı 403", async () => {
+  it("bilinmeyen kullanıcı / hatalı şifre 401, pasif kullanıcı 403", async () => {
+    const sifre = DEMO_GIRIS_SIFRESI
     await expect(
-      http.post("/auth/login", { personelId: "p_99" })
-    ).rejects.toMatchObject({ status: 404 })
+      http.post("/auth/login", { personelId: "p_99", sifre })
+    ).rejects.toMatchObject({ status: 401 })
+    await expect(
+      http.post("/auth/login", { personelId: "p_3", sifre: "yanlis-sifre" })
+    ).rejects.toMatchObject({ status: 401 })
+    expect(db.aktivite.count((a) => a.eylem === "GIRIS")).toBe(0)
     db.personel.update("p_4", { aktif: false })
     await expect(
-      http.post("/auth/login", { personelId: "p_4" })
+      http.post("/auth/login", { personelId: "p_4", sifre })
     ).rejects.toMatchObject({ status: 403 })
   })
 
@@ -92,6 +99,7 @@ describe("dev", () => {
     expect(await http.get("/dev/stats")).toEqual({
       buro: 1,
       personel: 4,
+      kimlik: 4,
       mukellef: 3,
       aktivite: 0,
       credential: 0,
@@ -101,10 +109,25 @@ describe("dev", () => {
       talep: 4,
       gelen: 3,
       gorev: 6,
-      nilvera: 2,
+      baglanti: 2,
       ebelge: 9,
       berat: 11,
+      kontor: 1,
+      tahakkuk: 0,
+      mizan: 0,
       bildirim: 0,
+      cari: 4,
+      kesintiAktarim: 0,
+      kesinti: 0,
+      tebligat: 3,
+      postaKutusu: 1,
+      kanal: 1,
+      bildirimTercihi: 0,
+      gonderim: 0,
+      okuma: 2,
+      fis: 3,
+      fisHesapAyari: 0,
+      lucaAktarim: 0,
     })
     await http.post("/dev/reset")
     expect(await http.get("/dev/stats")).toMatchObject({ mukellef: 40 })

@@ -1,6 +1,7 @@
 import type { Faker } from "@faker-js/faker"
 import { addDays, addMonths, format, subDays } from "date-fns"
 
+import { hediyeKontor } from "@/features/e-belge/kontor"
 import { takvimOlayId, yukumlulukleriHesapla } from "@/features/takvim/motor"
 import { generateTckn, generateVkn } from "@/lib/tax-id"
 import { fromYmd, toYmd } from "@/lib/tarih"
@@ -12,7 +13,8 @@ import type {
   EBelgeYon,
   EDefterBerat,
   Mukellef,
-  NilveraBaglanti,
+  EntegratorBaglanti,
+  KontorAlim,
   TakvimDurumKaydi,
 } from "@/types/domain"
 
@@ -24,7 +26,8 @@ const FATURA_ARALIGI = { baslangic: "2026-06-01", bitis: "2026-09-22" }
 export const SEED_BERAT_DONEMLERI = { ilk: "2025-09", son: "2026-08" }
 
 const KARSI_TARAF_EKLERI = ["Ltd. Şti.", "A.Ş.", "Tic. Ltd. Şti.", "San. A.Ş."]
-const HATALI_BAGLANTI = "Nilvera API anahtarı geçersiz veya süresi dolmuş (401)"
+const HATALI_BAGLANTI =
+  "Luca web servis anahtarı geçersiz veya süresi dolmuş (401)"
 
 /** Unvandan 3 harflik fatura seri öneki: "Çınar Yazılım" → "CNR" */
 export function seriOneki(unvan: string): string {
@@ -112,7 +115,7 @@ export function faturaUret(
 }
 
 function baglantilar(faker: Faker, mukellefler: Mukellef[]) {
-  const kayitlar: NilveraBaglanti[] = []
+  const kayitlar: EntegratorBaglanti[] = []
   let hataliSayisi = 0
   for (const m of mukellefler) {
     if (!m.aktif) continue
@@ -147,7 +150,7 @@ function baglantilar(faker: Faker, mukellefler: Mukellef[]) {
 function faturalar(
   faker: Faker,
   mukellefler: Mukellef[],
-  baglantiListesi: NilveraBaglanti[]
+  baglantiListesi: EntegratorBaglanti[]
 ) {
   const byId = new Map(mukellefler.map((m) => [m.id, m]))
   const kayitlar: EBelge[] = []
@@ -279,7 +282,7 @@ export function donemListesi(ilk: string, son: string): string[] {
 function beratlar(
   faker: Faker,
   mukellefler: Mukellef[],
-  baglantiListesi: NilveraBaglanti[],
+  baglantiListesi: EntegratorBaglanti[],
   takvim: TakvimDurumKaydi[]
 ) {
   const durumlar = new Map(takvim.map((t) => [t.id, t]))
@@ -343,12 +346,41 @@ export function createEBelgeVerisi(
   faker: Faker,
   mukellefler: Mukellef[],
   takvim: TakvimDurumKaydi[]
-): { nilvera: NilveraBaglanti[]; ebelge: EBelge[]; berat: EDefterBerat[] } {
+): {
+  baglanti: EntegratorBaglanti[]
+  ebelge: EBelge[]
+  berat: EDefterBerat[]
+  kontor: KontorAlim[]
+} {
   // Bağlantısı sonradan hatalanan mükelleflerin de geçmiş faturaları / beratları vardır
-  const nilvera = baglantilar(faker, mukellefler)
+  const baglanti = baglantilar(faker, mukellefler)
   return {
-    nilvera,
-    ebelge: faturalar(faker, mukellefler, nilvera),
-    berat: beratlar(faker, mukellefler, nilvera, takvim),
+    baglanti,
+    ebelge: faturalar(faker, mukellefler, baglanti),
+    berat: beratlar(faker, mukellefler, baglanti, takvim),
+    kontor: kontorAlimlari(),
   }
+}
+
+/** Faker kullanmaz (sonraki seed verisinin sırası değişmesin). Yönetici: p_1. */
+function kontorAlimlari(): KontorAlim[] {
+  return [
+    {
+      id: "u_001",
+      tarih: "2026-05-28",
+      paketAdet: 500,
+      hediyeAdet: hediyeKontor(500),
+      tutar: 900,
+      not: "Başlangıç paketi",
+      ekleyenId: "p_1",
+    },
+    {
+      id: "u_002",
+      tarih: "2026-08-14",
+      paketAdet: 250,
+      hediyeAdet: hediyeKontor(250),
+      tutar: 480,
+      ekleyenId: "p_1",
+    },
+  ]
 }

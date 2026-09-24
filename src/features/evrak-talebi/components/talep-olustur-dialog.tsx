@@ -30,7 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { GonderPaneli } from "@/features/evrak-talebi/components/gonder-paneli"
 import {
   GECERLILIK_SECENEKLERI,
@@ -53,7 +52,7 @@ export interface TalepHedef {
 const GECERLILIK_ITEMS = Object.fromEntries(
   GECERLILIK_SECENEKLERI.map((g) => [String(g), `${g} gün`])
 )
-const KANALLAR: TalepKanal[] = ["WHATSAPP", "SMS", "LINK"]
+const KANALLAR: TalepKanal[] = ["WHATSAPP", "EPOSTA", "LINK"]
 
 function oncekiAy() {
   const d = subMonths(new Date(), 1)
@@ -194,20 +193,23 @@ function TalepForm({
         </div>
 
         <Field>
-          <FieldLabel id="talep-kanal-etiket">Gönderim kanalı</FieldLabel>
-          <ToggleGroup
-            variant="outline"
-            spacing={0}
-            aria-labelledby="talep-kanal-etiket"
-            value={[kanal]}
-            onValueChange={(v) => v[0] && setKanal(v[0] as TalepKanal)}
+          <FieldLabel htmlFor="talep-kanal-etiket">Gönderim kanalı</FieldLabel>
+          <Select
+            items={KANAL_ETIKET}
+            value={kanal}
+            onValueChange={(v) => v && setKanal(v as TalepKanal)}
           >
-            {KANALLAR.map((k) => (
-              <ToggleGroupItem key={k} value={k}>
-                {KANAL_ETIKET[k]}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+            <SelectTrigger id="talep-kanal-etiket" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {KANALLAR.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {KANAL_ETIKET[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
 
         <Field>

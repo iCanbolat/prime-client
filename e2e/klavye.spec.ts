@@ -4,6 +4,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import { girisYap } from "./helpers"
 
 async function axeTemiz(page: Page, kapsam: string) {
+  // Yükleme göstergesi (yarı saydam açılış animasyonu sırasında) taranmasın
+  await expect(page.locator(`${kapsam} [aria-busy="true"]`)).toHaveCount(0)
   const sonuc = await new AxeBuilder({ page })
     .include(kapsam)
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])

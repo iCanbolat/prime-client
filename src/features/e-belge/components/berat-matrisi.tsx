@@ -131,7 +131,7 @@ export function BeratMatrisi({ mukellefId }: { mukellefId?: string }) {
       <EmptyState
         icon={BookOpen01Icon}
         title="e-Defter takibi yapılan mükellef yok"
-        description="e-Defter servisi açık Nilvera bağlantısı olan mükellefler burada görünür."
+        description="e-Defter servisi açık Luca bağlantısı olan mükellefler burada görünür."
       />
     )
 
@@ -319,7 +319,7 @@ export function BeratMatrisi({ mukellefId }: { mukellefId?: string }) {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Berat durumu Nilvera senkronuyla güncellenir; berat alınınca
+                  Berat durumu Luca senkronuyla güncellenir; berat alınınca
                   takvimdeki e-Defter berat yükümlülüğü otomatik olarak
                   onaylanır.
                 </p>

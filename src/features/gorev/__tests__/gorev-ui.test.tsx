@@ -400,15 +400,13 @@ describe("Dönem görevleri ve diğer ekranlar", () => {
     expect(within(satir).getByText("Kontrol")).toBeInTheDocument()
   })
 
-  it("gösterge panelinde açık görev sayısı", async () => {
-    renderRoute("/", { as: TEST_USERS.yonetici })
-    const ozet = await screen.findByRole("list", { name: "Özet" })
-    const hucre = within(ozet)
-      .getByText("Açık görev")
-      .closest("[data-slot=kpi]") as HTMLElement
-    await waitFor(() =>
-      expect(within(hucre).getByText("5")).toBeInTheDocument()
-    )
-    expect(within(hucre).getByText("1 görev gecikmiş")).toBeInTheDocument()
+  it("gösterge panelinde geciken bağımsız görev Yapılacaklar'da", async () => {
+    const { user } = renderRoute("/", { as: TEST_USERS.yonetici })
+    await user.click(await screen.findByRole("tab", { name: /Gecikenler/ }))
+    expect(
+      await within(screen.getByRole("tabpanel")).findByRole("listitem", {
+        name: /^Görev: Vergi levhası güncelleme/,
+      })
+    ).toBeInTheDocument()
   })
 })

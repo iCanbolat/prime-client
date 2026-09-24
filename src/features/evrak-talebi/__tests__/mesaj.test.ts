@@ -4,7 +4,8 @@ import { talepDurumu } from "@/features/evrak-talebi/durum"
 import {
   mesajOlustur,
   portalLinki,
-  smsLinki,
+  epostaLinki,
+  sablonHatasi,
   talepDegiskenleri,
   telefonNormalize,
   whatsappLinki,
@@ -70,13 +71,21 @@ describe("telefon ve paylaşım bağlantıları", () => {
     expect(whatsappLinki("12345", "x")).toBeNull()
   })
 
-  it("wa.me ve sms bağlantıları normalize numara ve kodlanmış metin içerir", () => {
+  it("wa.me ve mailto bağlantıları normalize adres ve kodlanmış metin içerir", () => {
     expect(whatsappLinki("0532 123 45 67", "Merhaba & link")).toBe(
       "https://wa.me/905321234567?text=Merhaba%20%26%20link"
     )
-    expect(smsLinki("05321234567", "Selam")).toBe(
-      "sms:+905321234567?body=Selam"
+    expect(epostaLinki(" ali@veli.com ", "Evrak talebi", "Selam & link")).toBe(
+      "mailto:ali@veli.com?subject=Evrak%20talebi&body=Selam%20%26%20link"
     )
+    expect(epostaLinki("gecersiz", "k", "m")).toBeNull()
+  })
+
+  it("şablon kuralları: TALEP/RED {link}, borç hatırlatma {bakiye} ister", () => {
+    expect(sablonHatasi("TALEP", "Merhaba")).toMatch(/\{link\}/)
+    expect(sablonHatasi("TAHAKKUK", "Tahakkuk {tutar}")).toBeNull()
+    expect(sablonHatasi("BORC_HATIRLATMA", "Borç")).toMatch(/\{bakiye\}/)
+    expect(sablonHatasi("RED", "  ")).toBe("Şablon boş olamaz")
   })
 })
 

@@ -147,8 +147,9 @@ describe("form ↔ API dönüşümü", () => {
       expect(
         mukellefFormSchema.safeParse(mukellefToFormValues(m)).success
       ).toBe(true)
+      // Tercih kanalı olmayan mükellef formda varsayılan WhatsApp ile döner
       expect(JSON.parse(JSON.stringify(input))).toEqual(
-        JSON.parse(JSON.stringify(beklenen))
+        JSON.parse(JSON.stringify({ tercihKanal: "WHATSAPP", ...beklenen }))
       )
     }
   })

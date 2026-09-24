@@ -1,6 +1,8 @@
 import { expect, type Page } from "@playwright/test"
 
 export const DEMO_KASA_SIFRESI = "demo1234"
+/** Seed kullanıcılarının giriş şifresi (`mocks/factories/personel.ts`). */
+export const DEMO_GIRIS_SIFRESI = "demo1234"
 
 /** Seed personeli: `p_1` yönetici, diğerleri personel. */
 export const KULLANICI = {
@@ -12,6 +14,8 @@ export const KULLANICI = {
 export async function girisYap(page: Page, ad: string = KULLANICI.yonetici) {
   await page.goto("/login")
   await page.getByRole("button", { name: new RegExp(ad) }).click()
+  await page.getByLabel("Şifre").fill(DEMO_GIRIS_SIFRESI)
+  await page.getByRole("button", { name: "Giriş yap" }).click()
   await expect(page).toHaveURL("/")
   await expect(
     page.getByRole("heading", { name: `Merhaba, ${ad.split(" ")[0]}` })

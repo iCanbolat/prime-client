@@ -11,7 +11,7 @@ import type {
   BeratDurumu,
   EFaturaYanit,
   GibDurumu,
-  NilveraBaglantiDurumu,
+  EntegratorBaglantiDurumu,
 } from "@/types/domain"
 
 const MAVI = "bg-sky-500/15 text-sky-700 dark:text-sky-300"
@@ -102,7 +102,7 @@ export function BeratDurumBadge({
   )
 }
 
-const BAGLANTI_RENK: Record<NilveraBaglantiDurumu, string> = {
+const BAGLANTI_RENK: Record<EntegratorBaglantiDurumu, string> = {
   BAGLI: YESIL,
   HATA: KIRMIZI,
   BAGLI_DEGIL: GRI,
@@ -112,7 +112,7 @@ export function BaglantiDurumBadge({
   durum,
   className,
 }: {
-  durum: NilveraBaglantiDurumu
+  durum: EntegratorBaglantiDurumu
   className?: string
 }) {
   return (

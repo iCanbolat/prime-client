@@ -62,6 +62,15 @@ describe("GET /api/arsiv", () => {
     expect(await liste({ q: "öztürk" })).toHaveLength(3)
   })
 
+  it("geçerlilik filtresi: süresi dolmuş / 30 gün içinde dolacak", async () => {
+    expect((await liste({ gecerlilik: "DOLDU" })).map((d) => d.id)).toEqual([
+      "d_as_imza",
+    ])
+    expect((await liste({ gecerlilik: "YAKINDA" })).map((d) => d.id)).toEqual([
+      "d_ltd_faaliyet",
+    ])
+  })
+
   it("boyuta göre azalan sıralar", async () => {
     const [ilk] = await liste({ sirala: "boyut", yon: "desc" })
     expect(ilk!.id).toBe("d_sahis_kimlik")

@@ -6,8 +6,8 @@ import type {
   EBelgeYon,
   EFaturaYanit,
   GibDurumu,
-  NilveraBaglantiDurumu,
-  NilveraOrtam,
+  EntegratorBaglantiDurumu,
+  EntegratorOrtam,
 } from "@/types/domain"
 
 export const EBELGE_TUR_ETIKET: Record<EBelgeTur, string> = {
@@ -54,13 +54,13 @@ export const BERAT_DURUM_ETIKET: Record<BeratDurumu, string> = {
   HATA: "Hatalı",
 }
 
-export const BAGLANTI_DURUM_ETIKET: Record<NilveraBaglantiDurumu, string> = {
+export const BAGLANTI_DURUM_ETIKET: Record<EntegratorBaglantiDurumu, string> = {
   BAGLI: "Bağlı",
   HATA: "Bağlantı hatası",
   BAGLI_DEGIL: "Bağlı değil",
 }
 
-export const ORTAM_ETIKET: Record<NilveraOrtam, string> = {
+export const ORTAM_ETIKET: Record<EntegratorOrtam, string> = {
   TEST: "Test",
   CANLI: "Canlı",
 }

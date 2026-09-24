@@ -1,22 +1,11 @@
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 
 import { girisYap } from "./helpers"
 
-async function acikGorevSayisi(page: Page): Promise<number> {
-  const deger = page
-    .getByRole("list", { name: "Özet" })
-    .getByRole("link", { name: /^Açık görev/ })
-    .locator(".tabular-nums")
-  await expect(deger).toHaveText(/^\d+$/)
-  return Number(await deger.textContent())
-}
-
-test("dönem görevlerini oluştur → kanban'da Tamam'a taşı → dashboard sayacı güncellenir", async ({
+test("dönem görevlerini oluştur → kanban'da klavyeyle Tamam'a taşı", async ({
   page,
 }) => {
   await girisYap(page)
-  const baslangic = await acikGorevSayisi(page)
-
   // Seed'de Ba-Bs görevi yok: geçen ay için tüm uygun mükelleflere görev aç
   await page.locator('a[href="/gorevler"]').first().click()
   await page.getByRole("button", { name: /Dönem görevlerini oluştur/ }).click()
@@ -51,8 +40,4 @@ test("dönem görevlerini oluştur → kanban'da Tamam'a taşı → dashboard sa
   await expect(duyuru).toContainText("Tamam sütununa bırakıldı")
   await expect(tamam.getByRole("article", { name: kartAdi })).toBeVisible()
   await expect(yapilacak.getByRole("article")).toHaveCount(adet - 1)
-
-  // Dashboard: yeni görevler eklendi, biri kapandı
-  await page.locator('a[href="/"]').first().click()
-  await expect.poll(() => acikGorevSayisi(page)).toBe(baslangic + adet - 1)
 })

@@ -24,6 +24,7 @@ type Patch = Partial<{
   yon: EBelgeYon | null
   gibDurumu: GibDurumu | null
   yanit: EFaturaYanit | null
+  yanitSuresi: "yaklasan" | null
   mukellef: string | null
   q: string | null
   /** "2026-09" */
@@ -45,7 +46,7 @@ export function donemAraligi(donem: string) {
 
 /**
  * Fatura listesi durumu URL'de:
- * /e-belge/e-fatura?yon=GELEN&yanit=BEKLIYOR&mukellef=m_001&donem=2026-09&q=…&sayfa=2&fatura=f_0012
+ * /e-belge/e-fatura?yon=GELEN&yanit=BEKLIYOR&yanitSuresi=yaklasan&mukellef=m_001&donem=2026-09&q=…&sayfa=2&fatura=f_0012
  * Varsayılanlar (tarihe göre yeniden eskiye, sayfa 1) URL'e yazılmaz. `sabitMukellef` verilirse
  * (mükellef kartı) mükellef filtresi URL yerine ondan gelir.
  */
@@ -63,6 +64,8 @@ export function useFaturaParams(tur: EBelgeTur, sabitMukellef?: string) {
       yon: yon && YONLER.includes(yon) ? yon : undefined,
       gibDurumu: gib && GIB.includes(gib) ? gib : undefined,
       yanit: yanit && YANITLAR.includes(yanit) ? yanit : undefined,
+      yanitSuresi:
+        get("yanitSuresi") === "yaklasan" ? ("yaklasan" as const) : undefined,
       mukellef: sabitMukellef ?? get("mukellef"),
       q: get("q") ?? "",
       donem: donem && DONEM_RE.test(donem) ? donem : undefined,
@@ -84,6 +87,10 @@ export function useFaturaParams(tur: EBelgeTur, sabitMukellef?: string) {
       yon: tur === "E_ARSIV" ? undefined : params.yon,
       gibDurumu: params.gibDurumu,
       yanit: params.yanit,
+      yanitYaklasan:
+        tur === "E_FATURA" && params.yanitSuresi === "yaklasan"
+          ? true
+          : undefined,
       q: params.q || undefined,
       ...(params.donem ? donemAraligi(params.donem) : {}),
       sirala: params.sirala,
@@ -120,6 +127,7 @@ export function useFaturaParams(tur: EBelgeTur, sabitMukellef?: string) {
     params.yon ||
     params.gibDurumu ||
     params.yanit ||
+    params.yanitSuresi ||
     (!sabitMukellef && params.mukellef) ||
     params.q ||
     params.donem
@@ -131,6 +139,7 @@ export function useFaturaParams(tur: EBelgeTur, sabitMukellef?: string) {
         yon: null,
         gibDurumu: null,
         yanit: null,
+        yanitSuresi: null,
         mukellef: null,
         q: null,
         donem: null,

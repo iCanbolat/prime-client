@@ -17,8 +17,13 @@ test("senkronize et → ticari faturayı reddet → faturayı arşive kaydet", a
 
   // Yanıt bekleyen ilk ticari faturayı gerekçeyle reddet
   await page.getByRole("button", { name: "Gelen" }).click()
-  await page.getByLabel("Yanıt durumu").click()
+  // Yanıt filtresi "Filtreler" panelinde; seçim "Uygula" ile URL'e yazılır
+  await page.getByRole("button", { name: "Filtreler" }).click()
+  const filtreler = page.getByRole("dialog", { name: "Filtreler" })
+  await filtreler.getByLabel("Yanıt durumu").click()
   await page.getByRole("option", { name: "Yanıt bekliyor" }).click()
+  // Dev'deki React Query devtools düğmesi sağ alttaki "Uygula"nın üstüne biniyor
+  await filtreler.getByRole("button", { name: "Uygula" }).press("Enter")
   await expect(page).toHaveURL(/yanit=BEKLIYOR/)
   const tablo = page.getByRole("table", { name: "Faturalar" })
   const ilk = tablo.getByRole("button", { name: /faturasını aç$/ }).first()

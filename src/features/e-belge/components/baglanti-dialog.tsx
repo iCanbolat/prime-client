@@ -1,4 +1,11 @@
 import { useForm, Controller } from "react-hook-form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 
@@ -19,33 +26,29 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useBaglantiKaydet } from "@/features/e-belge/queries"
 import { ORTAM_ETIKET } from "@/features/e-belge/sabitler"
 import { ApiError } from "@/lib/http"
 import { z } from "@/lib/zod"
-import type { NilveraBaglantiView } from "@/types/api"
-import type { NilveraOrtam } from "@/types/domain"
+import type { EntegratorBaglantiView } from "@/types/api"
+import type { EntegratorOrtam } from "@/types/domain"
 
 const baglantiSchema = z.object({
-  apiAnahtari: z
-    .string()
-    .trim()
-    .min(16, "API anahtarı en az 16 karakter olmalı"),
+  apiAnahtari: z.string().trim().min(16, "Anahtar en az 16 karakter olmalı"),
   ortam: z.enum(["TEST", "CANLI"]),
 })
 
 type BaglantiFormValues = z.infer<typeof baglantiSchema>
 
 /**
- * API anahtarı yalnızca bu formun (bellekteki) durumunda yaşar: backend'e bir kez gönderilir,
+ * Anahtar yalnızca bu formun (bellekteki) durumunda yaşar: backend'e bir kez gönderilir,
  * pencere kapanınca form yok olur. Yanıtta anahtarın yalnızca son 4 karakteri döner.
  */
 function BaglantiForm({
   baglanti,
   onClose,
 }: {
-  baglanti: NilveraBaglantiView
+  baglanti: EntegratorBaglantiView
   onClose: () => void
 }) {
   const kaydet = useBaglantiKaydet()
@@ -58,10 +61,10 @@ function BaglantiForm({
   const onSubmit = handleSubmit(async (values) => {
     try {
       await kaydet.mutateAsync({ mukellefId: baglanti.mukellefId, ...values })
-      toast.success(`${baglanti.mukellefUnvan} Nilvera'ya bağlandı`)
+      toast.success(`${baglanti.mukellefUnvan} Luca'ya bağlandı`)
       onClose()
     } catch (error) {
-      // 422: Nilvera anahtarı reddetti → alana yaz
+      // 422: Luca anahtarı reddetti → alana yaz
       if (error instanceof ApiError && error.status === 422)
         setError("apiAnahtari", { message: error.message })
       else toast.error(error instanceof Error ? error.message : "Kaydedilemedi")
@@ -75,15 +78,17 @@ function BaglantiForm({
     <form onSubmit={onSubmit} noValidate className="grid gap-4">
       <DialogHeader>
         <DialogTitle>
-          {yenileme ? "Nilvera bağlantısını yenile" : "Nilvera'ya bağla"}
+          {yenileme ? "Luca bağlantısını yenile" : "Luca'ya bağla"}
         </DialogTitle>
         <DialogDescription>{baglanti.mukellefUnvan}</DialogDescription>
       </DialogHeader>
       <FieldGroup>
         <Field data-invalid={Boolean(hata) || undefined}>
-          <FieldLabel htmlFor="nilvera-anahtar">API anahtarı</FieldLabel>
+          <FieldLabel htmlFor="entegrator-anahtar">
+            Web servis anahtarı
+          </FieldLabel>
           <Input
-            id="nilvera-anahtar"
+            id="entegrator-anahtar"
             type="password"
             autoComplete="off"
             spellCheck={false}
@@ -91,8 +96,9 @@ function BaglantiForm({
             {...register("apiAnahtari")}
           />
           <FieldDescription>
-            Mükellefin Nilvera hesabında oluşturulan API anahtarı. Anahtar
-            sunucuda şifreli saklanır; bir daha görüntülenemez.
+            Luca e-Entegratör portalında mükellef için tanımlanan web servis
+            anahtarı. Anahtar sunucuda şifreli saklanır; bir daha
+            görüntülenemez.
             {yenileme && baglanti.anahtarIpucu && (
               <> Mevcut anahtar: ••••{baglanti.anahtarIpucu}</>
             )}
@@ -100,26 +106,27 @@ function BaglantiForm({
           <FieldError>{hata}</FieldError>
         </Field>
         <Field>
-          <FieldLabel id="nilvera-ortam">Ortam</FieldLabel>
+          <FieldLabel htmlFor="entegrator-ortam">Ortam</FieldLabel>
           <Controller
             control={control}
             name="ortam"
             render={({ field }) => (
-              <ToggleGroup
-                variant="outline"
-                spacing={0}
-                aria-labelledby="nilvera-ortam"
-                value={[field.value]}
-                onValueChange={(v) =>
-                  v[0] && field.onChange(v[0] as NilveraOrtam)
-                }
+              <Select
+                items={ORTAM_ETIKET}
+                value={field.value}
+                onValueChange={(v) => v && field.onChange(v as EntegratorOrtam)}
               >
-                {(Object.keys(ORTAM_ETIKET) as NilveraOrtam[]).map((o) => (
-                  <ToggleGroupItem key={o} value={o}>
-                    {ORTAM_ETIKET[o]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
+                <SelectTrigger id="entegrator-ortam" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(ORTAM_ETIKET) as EntegratorOrtam[]).map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {ORTAM_ETIKET[o]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           />
         </Field>
@@ -140,7 +147,7 @@ export function BaglantiDialog({
   baglanti,
   onClose,
 }: {
-  baglanti: NilveraBaglantiView | null
+  baglanti: EntegratorBaglantiView | null
   onClose: () => void
 }) {
   return (

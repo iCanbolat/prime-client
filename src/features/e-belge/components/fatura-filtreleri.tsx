@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useFaturaParams } from "@/features/e-belge/hooks/use-fatura-params"
+import { YANIT_UYARI_GUN } from "@/features/e-belge/kurallar"
 import {
   EBELGE_YON_ETIKET,
   GIB_DURUM_ETIKET,
@@ -98,6 +99,7 @@ interface SheetFiltreleri {
   donem: string | null
   gibDurumu: GibDurumu | null
   yanit: EFaturaYanit | null
+  yanitSuresi: "yaklasan" | null
   siralama: keyof typeof SIRALAMA_ETIKET
 }
 
@@ -106,7 +108,12 @@ const VARSAYILAN: SheetFiltreleri = {
   donem: null,
   gibDurumu: null,
   yanit: null,
+  yanitSuresi: null,
   siralama: "tarih:desc",
+}
+
+const YANIT_SURESI_ETIKET = {
+  yaklasan: `${YANIT_UYARI_GUN} gün içinde dolacak`,
 }
 
 export function FaturaFiltreleri({
@@ -130,6 +137,7 @@ export function FaturaFiltreleri({
     donem: params.donem ?? null,
     gibDurumu: params.gibDurumu ?? null,
     yanit: params.yanit ?? null,
+    yanitSuresi: params.yanitSuresi ?? null,
     siralama:
       `${params.sirala}:${params.siralamaYonu}` as SheetFiltreleri["siralama"],
   }
@@ -137,7 +145,8 @@ export function FaturaFiltreleri({
     Number(!sabitMukellef && Boolean(params.mukellef)) +
     Number(Boolean(params.donem)) +
     Number(Boolean(params.gibDurumu)) +
-    Number(Boolean(params.yanit))
+    Number(Boolean(params.yanit)) +
+    Number(Boolean(params.yanitSuresi))
 
   return (
     <ListeAraclari
@@ -157,7 +166,10 @@ export function FaturaFiltreleri({
           secenekler={EBELGE_YON_ETIKET}
           value={params.yon}
           onChange={(yon) =>
-            update({ yon, ...(yon === "GIDEN" ? { yanit: null } : {}) })
+            update({
+              yon,
+              ...(yon === "GIDEN" ? { yanit: null, yanitSuresi: null } : {}),
+            })
           }
         />
       ) : (
@@ -178,6 +190,7 @@ export function FaturaFiltreleri({
               donem: t.donem,
               gibDurumu: t.gibDurumu,
               yanit: yanitGoster ? t.yanit : null,
+              yanitSuresi: yanitGoster ? t.yanitSuresi : null,
               sirala,
               siralamaYonu,
             })
@@ -222,6 +235,20 @@ export function FaturaFiltreleri({
                     secenekler={YANIT_ETIKET}
                     value={taslak.yanit}
                     onChange={(yanit) => degistir({ yanit })}
+                  />
+                </FiltreAlani>
+              )}
+              {yanitGoster && (
+                <FiltreAlani
+                  etiket="Yanıt süresi"
+                  htmlFor="filtre-yanit-suresi"
+                >
+                  <FiltreSelect<"yaklasan">
+                    id="filtre-yanit-suresi"
+                    tumu="Tümü"
+                    secenekler={YANIT_SURESI_ETIKET}
+                    value={taslak.yanitSuresi}
+                    onChange={(yanitSuresi) => degistir({ yanitSuresi })}
                   />
                 </FiltreAlani>
               )}

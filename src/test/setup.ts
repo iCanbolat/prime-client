@@ -10,8 +10,8 @@ import { setDbState } from "@/mocks/db"
 import { createFixtureState } from "@/mocks/fixtures"
 import { server } from "@/mocks/server"
 
-// Lazy route'lar ilk import'ta paralel test yükü altında 1 sn'yi aşabiliyor
-configure({ asyncUtilTimeout: 3000 })
+// Lazy route'lar ilk import'ta paralel test yükü altında birkaç saniyeyi bulabiliyor
+configure({ asyncUtilTimeout: 6000 })
 
 // --- jsdom eksikleri ---------------------------------------------------------
 if (!window.matchMedia) {

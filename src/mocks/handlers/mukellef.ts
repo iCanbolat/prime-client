@@ -68,7 +68,9 @@ function validateMukellef(
 }
 
 /** Türe ait olmayan kimlik alanlarını temizler (Şahıs'ta VKN, şirkette TCKN kalmasın). */
-function normalizeInput(input: MukellefInput): MukellefInput {
+function normalizeInput(body: MukellefInput): MukellefInput {
+  // Ücret yalnızca yöneticinin kullandığı `PUT /mukellefler/:id/ucret` ile değişir
+  const { ucret: _ucret, ...input } = body
   const isSahis = input.tur === "SAHIS"
   return {
     ...input,
@@ -79,6 +81,10 @@ function normalizeInput(input: MukellefInput): MukellefInput {
     mersisNo: isSahis ? undefined : input.mersisNo || undefined,
     defterTuru: isSahis ? input.defterTuru : "BILANCO",
     sgkIsyeriVar: input.calisanSayisi > 0 ? true : input.sgkIsyeriVar,
+    tercihKanal:
+      input.tercihKanal === "EPOSTA" || input.tercihKanal === "WHATSAPP"
+        ? input.tercihKanal
+        : undefined,
   }
 }
 

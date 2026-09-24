@@ -4,7 +4,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Copy01Icon,
   Link01Icon,
-  Message01Icon,
+  Mail01Icon,
   WhatsappIcon,
 } from "@hugeicons/core-free-icons"
 
@@ -19,15 +19,19 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { useBuro } from "@/features/ayarlar/queries"
 import {
+  epostaGecerli,
+  epostaLinki,
   mesajOlustur,
   portalLinki,
-  smsLinki,
   talepDegiskenleri,
   telefonNormalize,
   whatsappLinki,
 } from "@/features/evrak-talebi/mesaj"
 import { useTalepGonderim } from "@/features/evrak-talebi/queries"
 import { VARSAYILAN_SABLONLAR } from "@/features/evrak-talebi/sabitler"
+import { kanalHazir } from "@/features/kanal/kurallar"
+import { E_POSTA_KONU } from "@/features/kanal/sabitler"
+import { useKanallar, useMukellefeGonder } from "@/features/kanal/queries"
 import { formatPhone } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { TalepView } from "@/types/api"
@@ -50,8 +54,8 @@ async function kopyala(metin: string, mesaj: string) {
 }
 
 /**
- * Talep mesajının önizlemesi ve paylaşım eylemleri (WhatsApp, SMS, kopyala).
- * Her paylaşım "gönderim" olarak kaydedilir.
+ * Talep mesajının önizlemesi ve paylaşım eylemleri (WhatsApp, e-posta, kopyala). Kanal Ayarlar'da
+ * yapılandırılmışsa mesaj sunucudan gider; değilse wa.me / mailto açılır. Her paylaşım kaydedilir.
  */
 export function GonderPaneli({
   talep,
@@ -75,7 +79,37 @@ export function GonderPaneli({
   )
   const [mesaj, setMesaj] = useState(varsayilan)
   const telefonGecerli = telefonNormalize(talep.mukellefTelefon) !== null
+  const epostaVar = epostaGecerli(talep.mukellefEposta)
   const aktif = talep.durum === "AKTIF"
+  const kanallar = useKanallar()
+  const gonder = useMukellefeGonder()
+  const waSunucu = kanalHazir(kanallar.data?.WHATSAPP)
+  const epostaSunucu = kanalHazir(kanallar.data?.EPOSTA)
+  const konu = `${E_POSTA_KONU[sablon]} — ${buro?.ad ?? ""}`
+
+  const sunucudanGonder = (kanal: "WHATSAPP" | "EPOSTA") =>
+    gonder.mutate(
+      {
+        sablon,
+        kanal,
+        neden,
+        metin: kanal === "EPOSTA" ? mesaj : undefined,
+        hedefler: [{ mukellefId: talep.mukellefId, talepId: talep.id }],
+      },
+      {
+        onSuccess: ({ sonuclar }) => {
+          const s = sonuclar[0]
+          if (s?.durum === "GONDERILDI")
+            toast.success(
+              kanal === "WHATSAPP"
+                ? "WhatsApp mesajı gönderildi"
+                : "E-posta gönderildi"
+            )
+          else toast.error(s?.hataMesaji ?? "Gönderilemedi")
+        },
+        onError: (error) => toast.error(error.message),
+      }
+    )
 
   const kaydet = (kanal: TalepKanal) => {
     if (!aktif) return
@@ -96,9 +130,13 @@ export function GonderPaneli({
           onChange={(e) => setMesaj(e.target.value)}
         />
         <FieldDescription>
-          {telefonGecerli
-            ? `Alıcı: ${formatPhone(talep.mukellefTelefon)}`
-            : "Mükellefin geçerli bir cep telefonu yok; bağlantıyı kopyalayıp paylaşın."}
+          {[
+            telefonGecerli && formatPhone(talep.mukellefTelefon),
+            epostaVar && talep.mukellefEposta,
+          ]
+            .filter(Boolean)
+            .join(" · ") ||
+            "Mükellefin geçerli telefonu veya e-postası yok; bağlantıyı kopyalayıp paylaşın."}
         </FieldDescription>
       </Field>
 
@@ -127,49 +165,75 @@ export function GonderPaneli({
       </Field>
 
       <div className="grid gap-2 sm:grid-cols-3">
-        <a
-          href={
-            telefonGecerli
-              ? (whatsappLinki(talep.mukellefTelefon, mesaj) ?? undefined)
-              : undefined
-          }
-          target="_blank"
-          rel="noreferrer"
-          aria-disabled={!telefonGecerli || undefined}
-          onClick={() => kaydet("WHATSAPP")}
-          className={cn(
-            buttonVariants(),
-            "bg-emerald-600 text-white hover:bg-emerald-700",
-            !telefonGecerli && "pointer-events-none opacity-50"
-          )}
-        >
-          <HugeiconsIcon
-            icon={WhatsappIcon}
-            strokeWidth={2}
-            data-icon="inline-start"
-          />
-          WhatsApp'ta aç
-        </a>
-        <a
-          href={
-            telefonGecerli
-              ? (smsLinki(talep.mukellefTelefon, mesaj) ?? undefined)
-              : undefined
-          }
-          aria-disabled={!telefonGecerli || undefined}
-          onClick={() => kaydet("SMS")}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            !telefonGecerli && "pointer-events-none opacity-50"
-          )}
-        >
-          <HugeiconsIcon
-            icon={Message01Icon}
-            strokeWidth={2}
-            data-icon="inline-start"
-          />
-          SMS ile gönder
-        </a>
+        {waSunucu ? (
+          <Button
+            disabled={!aktif || !telefonGecerli || gonder.isPending}
+            onClick={() => sunucudanGonder("WHATSAPP")}
+            className="bg-emerald-600 text-white hover:bg-emerald-700"
+          >
+            <HugeiconsIcon
+              icon={WhatsappIcon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            WhatsApp ile gönder
+          </Button>
+        ) : (
+          <a
+            href={
+              telefonGecerli
+                ? (whatsappLinki(talep.mukellefTelefon, mesaj) ?? undefined)
+                : undefined
+            }
+            target="_blank"
+            rel="noreferrer"
+            aria-disabled={!telefonGecerli || undefined}
+            onClick={() => kaydet("WHATSAPP")}
+            className={cn(
+              buttonVariants(),
+              "bg-emerald-600 text-white hover:bg-emerald-700",
+              !telefonGecerli && "pointer-events-none opacity-50"
+            )}
+          >
+            <HugeiconsIcon
+              icon={WhatsappIcon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            WhatsApp'ta aç
+          </a>
+        )}
+        {epostaSunucu ? (
+          <Button
+            variant="outline"
+            disabled={!aktif || !epostaVar || gonder.isPending}
+            onClick={() => sunucudanGonder("EPOSTA")}
+          >
+            <HugeiconsIcon
+              icon={Mail01Icon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            E-posta ile gönder
+          </Button>
+        ) : (
+          <a
+            href={epostaLinki(talep.mukellefEposta, konu, mesaj) ?? undefined}
+            aria-disabled={!epostaVar || undefined}
+            onClick={() => kaydet("EPOSTA")}
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              !epostaVar && "pointer-events-none opacity-50"
+            )}
+          >
+            <HugeiconsIcon
+              icon={Mail01Icon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            E-postada aç
+          </a>
+        )}
         <Button
           variant="outline"
           onClick={() => {
@@ -185,6 +249,12 @@ export function GonderPaneli({
           Mesajı kopyala
         </Button>
       </div>
+      {waSunucu && (
+        <p className="text-xs text-muted-foreground">
+          WhatsApp Business onaylı şablonla gönderir; düzenlenen metin yalnızca
+          e-posta ve kopyalamada kullanılır.
+        </p>
+      )}
     </div>
   )
 }

@@ -76,7 +76,7 @@ export function FaturaListesi({
           description={
             hasFilters
               ? "Arama veya filtreleri değiştirmeyi deneyin."
-              : "Faturalar Nilvera senkronuyla gelir."
+              : "Faturalar Luca senkronuyla gelir."
           }
           action={
             hasFilters && (

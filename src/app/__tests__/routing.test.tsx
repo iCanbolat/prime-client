@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import { useAuthStore } from "@/features/auth/store"
 import { db } from "@/mocks/db"
+import { DEMO_GIRIS_SIFRESI } from "@/mocks/factories/personel"
 import { setMockErrorPattern } from "@/mocks/config"
 import { TEST_USERS, renderRoute } from "@/test/render"
 
@@ -16,11 +17,20 @@ describe("kimlik doğrulama yönlendirmeleri", () => {
     })
   })
 
-  it("kullanıcı seçilince giriş yapılır ve geldiği sayfaya döner", async () => {
+  it("kullanıcı seçilip şifre girilince giriş yapılır ve geldiği sayfaya döner", async () => {
     const { router, user } = renderRoute("/takvim")
     await user.click(
       await screen.findByRole("button", { name: /Zeynep Demir/ })
     )
+    await user.type(screen.getByLabelText("Şifre"), "yanlis-sifre")
+    await user.click(screen.getByRole("button", { name: "Giriş yap" }))
+    expect(
+      await screen.findByText("Kullanıcı veya şifre hatalı")
+    ).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe("/login")
+
+    await user.type(screen.getByLabelText("Şifre"), DEMO_GIRIS_SIFRESI)
+    await user.click(screen.getByRole("button", { name: "Giriş yap" }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe("/takvim"))
     expect(useAuthStore.getState().user?.id).toBe("p_3")
@@ -143,17 +153,14 @@ describe("app shell", () => {
     )
   })
 
-  it("dashboard aktif mükellef sayısını gösterir", async () => {
+  it("dashboard Yapılacaklar kartını gösterir", async () => {
     renderRoute("/", { as: TEST_USERS.personel })
     expect(
       await screen.findByRole("heading", { name: "Merhaba, Mehmet" })
     ).toBeInTheDocument()
-    const card = (label: string) =>
-      within(screen.getByRole("list", { name: "Özet" }))
-        .getByText(label)
-        .closest("[data-slot=kpi]") as HTMLElement
+    const sekme = await screen.findByRole("tab", { name: /^Bu hafta/ })
     await waitFor(() =>
-      expect(within(card("Aktif mükellef")).getByText("3")).toBeInTheDocument()
+      expect(within(sekme).getByText(/^\d+$/)).toBeInTheDocument()
     )
   })
 
@@ -165,7 +172,7 @@ describe("app shell", () => {
     setMockErrorPattern(null)
     await user.click(screen.getByRole("button", { name: /Tekrar dene/ }))
     expect(
-      await screen.findByText("Bu hafta son günü olan")
+      await screen.findByRole("tab", { name: /^Bu hafta/ })
     ).toBeInTheDocument()
   })
 })

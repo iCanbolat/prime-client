@@ -17,10 +17,17 @@ export interface Buro {
   adres: string
   /** Evrak talebi mesaj şablonları; değişkenler: {unvan} {donem} {link} {buro} {sonTarih} {evraklar} {neden} */
   mesajSablonlari: Record<MesajSablonTip, string>
+  /** Ücret ödemeleri için büro IBAN'ı (borç hatırlatma mesajında) */
+  iban?: string
+  /** Luca "Excel Veri Aktarımı" sütun düzeni; yoksa varsayılan kullanılır */
+  lucaSablonu?: LucaSablonAyari
 }
 
-/** TALEP: ilk gönderim / yeniden gönderim; RED: reddedilen evrak için tekrar yükleme isteği */
-export type MesajSablonTip = "TALEP" | "RED"
+/**
+ * TALEP: ilk gönderim / yeniden gönderim; RED: reddedilen evrak için tekrar yükleme isteği;
+ * TAHAKKUK: beyanname tahakkukunun mükellefe iletilmesi; BORC_HATIRLATMA: ücret borcu hatırlatması
+ */
+export type MesajSablonTip = "TALEP" | "RED" | "TAHAKKUK" | "BORC_HATIRLATMA"
 
 export interface Personel {
   id: string
@@ -32,6 +39,17 @@ export interface Personel {
   /** Avatar arka planı için tailwind renk anahtarı */
   renk: PersonelRenk
   aktif: boolean
+}
+
+/**
+ * Personel giriş şifresinin özeti (id = personelId). Yalnızca sunucuda tutulur; `/personel`
+ * yanıtlarına hiçbir zaman eklenmez. PBKDF2-SHA256, 32 byte.
+ */
+export interface PersonelKimlik {
+  id: string
+  salt: string
+  hash: string
+  iterations: number
 }
 
 export type PersonelRenk = "blue" | "emerald" | "amber" | "rose" | "violet"
@@ -70,6 +88,23 @@ export interface Mukellef {
   aktif: boolean
   etiketler: string[]
   olusturmaTarihi: ISODateString
+  /** Büronun bu mükelleften aldığı aylık hizmet bedeli; tanımlıysa her ay otomatik borçlandırılır */
+  ucret?: MukellefUcret
+  /** Mükellefe gönderimde tercih edilen kanal; yoksa telefon varsa WhatsApp, yoksa e-posta */
+  tercihKanal?: MukellefKanal
+}
+
+export type MukellefKanal = "WHATSAPP" | "EPOSTA"
+
+/** Aylık serbest meslek ücreti. Tutarlar TL; KDV ve stopaj brütten hesaplanır. */
+export interface MukellefUcret {
+  aylikBrut: number
+  /** Yüzde, ör. 20 */
+  kdvOrani: number
+  /** Mükellef %20 gelir vergisi stopajı keser mi (tevkifat sorumlusu) */
+  stopajVar: boolean
+  /** İlk borçlandırılacak dönem ("2026-01") */
+  baslangicDonem: string
 }
 
 export type AktiviteEylem =
@@ -105,12 +140,36 @@ export type AktiviteEylem =
   | "GOREV_YORUMLANDI"
   | "GOREV_SILINDI"
   | "DONEM_GOREVLERI_OLUSTURULDU"
-  | "NILVERA_BAGLANDI"
-  | "NILVERA_BAGLANTI_KALDIRILDI"
+  | "ENTEGRATOR_BAGLANDI"
+  | "ENTEGRATOR_BAGLANTI_KALDIRILDI"
   | "EBELGE_SENKRONIZE_EDILDI"
   | "EFATURA_KABUL_EDILDI"
   | "EFATURA_REDDEDILDI"
   | "EBELGE_ARSIVE_KAYDEDILDI"
+  | "KONTOR_ALINDI"
+  | "TAHAKKUK_ICE_AKTARILDI"
+  | "MIZAN_ICE_AKTARILDI"
+  | "TAHSILAT_BORC_EKLENDI"
+  | "TAHSILAT_ODEME_ALINDI"
+  | "TAHSILAT_HAREKET_SILINDI"
+  | "UCRET_GUNCELLENDI"
+  | "KESINTI_ICE_AKTARILDI"
+  | "BURO_GUNCELLENDI"
+  | "TEBLIGAT_ALINDI"
+  | "TEBLIGAT_GUNCELLENDI"
+  | "POSTA_KUTUSU_BAGLANDI"
+  | "POSTA_KUTUSU_KALDIRILDI"
+  | "KANAL_GUNCELLENDI"
+  | "KANAL_KALDIRILDI"
+  | "MUKELLEFE_GONDERILDI"
+  | "FIS_OKUNDU"
+  | "FIS_ONAYLANDI"
+  | "LUCA_AKTARIMI"
+  | "LUCA_AKTARIMI_GERI_ALINDI"
+  | "PERSONEL_EKLENDI"
+  | "PERSONEL_GUNCELLENDI"
+  | "PERSONEL_SIFRESI_DEGISTI"
+  | "PERSONEL_SILINDI"
 
 export interface AktiviteLog {
   id: string
@@ -124,6 +183,9 @@ export interface AktiviteLog {
     | "TAKVIM"
     | "ARSIV"
     | "EBELGE"
+    | "TAHSILAT"
+    | "TEBLIGAT"
+    | "FIS"
   hedefId?: string
   /** Kaydın ilişkili olduğu mükellef (mükellef kartındaki aktivite akışı için) */
   mukellefId?: string
@@ -139,6 +201,8 @@ export type BildirimTur =
   | "BELGE_GECERLILIK"
   | "EFATURA_YANIT_SURESI"
   | "BEYAN_YAKLASIYOR"
+  | "ODEME_GECIKTI"
+  | "TEBLIGAT_SURE_YAKLASIYOR"
 
 /** Uygulama içi bildirim. `aliciId: null` → tüm kullanıcılara yayın (aktörün kendisi hariç). */
 export interface Bildirim {
@@ -240,6 +304,10 @@ export type ArsivKategori =
   | "FAALIYET_BELGESI"
   | "KIMLIK"
   | "FATURA"
+  | "BANKA_EKSTRESI"
+  | "TAHAKKUK"
+  | "MIZAN"
+  | "TEBLIGAT"
   | "DIGER"
 
 /**
@@ -263,7 +331,7 @@ export interface ArsivDosya {
   silinmeTarihi?: ISODateString
 }
 
-export type TalepKanal = "WHATSAPP" | "SMS" | "LINK"
+export type TalepKanal = "WHATSAPP" | "EPOSTA" | "LINK"
 /** Saklanan durum. "Süresi doldu" saklanmaz; `sonKullanma` ve şimdiden türetilir. */
 export type TalepKayitDurumu = "AKTIF" | "TAMAMLANDI" | "IPTAL"
 export type TalepDurumu = TalepKayitDurumu | "SURESI_DOLDU"
@@ -328,6 +396,8 @@ export interface GelenEvrak {
   redNedeni?: string
   /** Onaylanınca oluşturulan arşiv dosyası */
   arsivDosyaId?: string
+  /** Fiş / ekstre onaylanınca başlatılan okuma (Fiş aktarımı) */
+  okumaId?: string
   inceleyenId?: string
   incelemeTarihi?: ISODateString
 }
@@ -382,27 +452,27 @@ export interface Gorev {
   otomatikAnahtar?: string
 }
 
-// --- e-Belge (Nilvera) ------------------------------------------------------
+// --- e-Belge (Luca) ------------------------------------------------------
 
 /**
- * Mükellefin Nilvera hesabıyla bağlantısı (mükellef başına bir kayıt). API anahtarı yalnızca
+ * Mükellefin Luca hesabıyla bağlantısı (mükellef başına bir kayıt). Web servis anahtarı yalnızca
  * backend'de şifreli saklanır; istemci ve mock DB yalnızca son 4 haneyi (`anahtarIpucu`) görür.
  */
-export type NilveraBaglantiDurumu = "BAGLI" | "HATA" | "BAGLI_DEGIL"
-export type NilveraOrtam = "TEST" | "CANLI"
+export type EntegratorBaglantiDurumu = "BAGLI" | "HATA" | "BAGLI_DEGIL"
+export type EntegratorOrtam = "TEST" | "CANLI"
 
-export interface NilveraBaglanti {
+export interface EntegratorBaglanti {
   id: string
   mukellefId: string
-  durum: NilveraBaglantiDurumu
-  ortam: NilveraOrtam
-  /** Nilvera'da açık servisler (GİB kayıtlı kullanıcı durumu) */
+  durum: EntegratorBaglantiDurumu
+  ortam: EntegratorOrtam
+  /** Luca'da açık servisler (GİB kayıtlı kullanıcı durumu) */
   eFatura: boolean
   eArsiv: boolean
   eDefter: boolean
   /** e-Fatura gelen posta kutusu etiketi, ör. "urn:mail:defaultpk@cinar.com.tr" */
   postaKutusu?: string
-  /** API anahtarının son 4 karakteri */
+  /** Web servis anahtarının son 4 karakteri */
   anahtarIpucu?: string
   sonSenkron?: ISODateString
   hataMesaji?: string
@@ -422,7 +492,7 @@ export type EFaturaYanitKayit = "BEKLIYOR" | "KABUL" | "RED"
 export type EFaturaYanit = EFaturaYanitKayit | "SURESI_DOLDU"
 
 /**
- * Nilvera'dan senkronize edilen e-Fatura / e-Arşiv faturası (başlık bilgisi).
+ * Luca'dan senkronize edilen e-Fatura / e-Arşiv faturası (başlık bilgisi).
  * Kalemler saklanmaz; detay isteğinde entegratörden alınır.
  */
 export interface EBelge {
@@ -477,6 +547,10 @@ export const ARSIV_KATEGORI_ETIKET: Record<ArsivKategori, string> = {
   FAALIYET_BELGESI: "Faaliyet belgesi",
   KIMLIK: "Kimlik",
   FATURA: "Fatura",
+  BANKA_EKSTRESI: "Banka ekstresi",
+  TAHAKKUK: "Tahakkuk fişi",
+  MIZAN: "Mizan",
+  TEBLIGAT: "e-Tebligat",
   DIGER: "Diğer",
 }
 
@@ -489,4 +563,449 @@ export const MUKELLEF_TUR_ETIKET: Record<MukellefTur, string> = {
 export const ROL_ETIKET: Record<Rol, string> = {
   YONETICI: "Yönetici",
   PERSONEL: "Personel",
+}
+
+/**
+ * Büronun Luca'dan aldığı kontör paketi. Kontör havuzu büroya aittir; tüketim ayrıca saklanmaz,
+ * senkronize edilen e-belgelerden hesaplanır (bkz. `features/e-belge/kontor.ts`).
+ */
+export interface KontorAlim {
+  id: string
+  /** yyyy-MM-dd */
+  tarih: string
+  paketAdet: number
+  /** Luca Net / Koza kullanıcılarına verilen hediye kontör */
+  hediyeAdet: number
+  /** KDV dahil ödenen tutar (TL) */
+  tutar: number
+  not?: string
+  ekleyenId: string
+}
+
+// --- İçe aktarım ----------------------------------------------------------------
+
+/**
+ * e-Beyanname tahakkuk fişinden içe aktarılan kayıt. İçe aktarım takvimdeki beyanı
+ * "Onaylandı" yapar; PDF arşive (TAHAKKUK) kaydedilir. Mükellef + tip + dönem başına bir kayıt.
+ */
+export interface Tahakkuk {
+  id: string
+  mukellefId: string
+  tip: YukumlulukTip
+  /** Takvim dönemi: "2026-08" / "2026-Q2" / "2025" */
+  donem: string
+  /** GİB beyanname kodu, ör. "KDV1", "MUHSGK" */
+  beyannameKodu?: string
+  tahakkukNo?: string
+  /** Ödenecek toplam (TL) */
+  odenecek?: number
+  /** yyyy-MM-dd */
+  vade?: string
+  arsivDosyaId?: string
+  yukleyenId: string
+  yuklemeTarihi: ISODateString
+}
+
+export type MizanKontrolDurumu = "GECTI" | "UYARI" | "HATA"
+
+export interface MizanKontrol {
+  kod: string
+  durum: MizanKontrolDurumu
+  baslik: string
+  aciklama?: string
+}
+
+/** Ana hesap (3 haneli) düzeyinde mizan satırı */
+export interface MizanHesap {
+  kod: string
+  ad: string
+  borc: number
+  alacak: number
+}
+
+/**
+ * Muhasebe paketinden (Luca, Zirve, ETA…) alınan mizanın içe aktarılmış hali.
+ * Mükellef + dönem başına bir kayıt; kontroller içe aktarım anında çalışır.
+ */
+export interface Mizan {
+  id: string
+  mukellefId: string
+  /** "2026-08": mizanın ait olduğu ay (kümülatif) */
+  donem: string
+  dosyaAdi: string
+  hesaplar: MizanHesap[]
+  kontroller: MizanKontrol[]
+  arsivDosyaId?: string
+  yukleyenId: string
+  yuklemeTarihi: ISODateString
+}
+
+// --- Tahsilat ------------------------------------------------------------------
+
+/**
+ * Büronun kendi cari hesabı (mükelleften alacağı hizmet bedeli). Mükellefin ticari muhasebesi
+ * değildir. BORC: aylık ücret / ek hizmet; ODEME: tahsilat ya da alacak düzeltmesi (indirim).
+ */
+export type CariHareketTip = "BORC" | "ODEME"
+export type CariKalem = "AYLIK_UCRET" | "EK_HIZMET" | "ODEME" | "DUZELTME"
+
+export interface Kapatma {
+  borcId: string
+  tutar: number
+}
+
+export interface CariHareket {
+  id: string
+  mukellefId: string
+  tip: CariHareketTip
+  kalem: CariKalem
+  /** Aylık ücrette ait olduğu dönem ("2026-09") */
+  donem?: string
+  /** yyyy-MM-dd — borçta tahakkuk, ödemede tahsil tarihi */
+  tarih: string
+  /** Borçta brüt ücret; ödemede 0 */
+  brut: number
+  kdv: number
+  /** Mükellefin keseceği gelir vergisi stopajı */
+  stopaj: number
+  /** Borçta ödenecek net (brüt + KDV − stopaj); ödemede alınan tutar */
+  tutar: number
+  aciklama?: string
+  /** Serbest meslek makbuzu no */
+  makbuzNo?: string
+  /** Yalnızca ODEME: hangi borçları kapattığı. Dağıtılmayan kısım avanstır. */
+  kapatmalar?: Kapatma[]
+  /** Otomatik aylık ücrette `UCRET:${mukellefId}:${donem}` — idempotent üretim */
+  otomatikAnahtar?: string
+  olusturanId: string
+  olusturmaTarihi: ISODateString
+}
+
+/** İVD "Hakkınızda yapılan kesintiler" listesinin bir yılı için içe aktarım */
+export interface KesintiIceAktarim {
+  id: string
+  yil: number
+  dosyaAdi: string
+  satirSayisi: number
+  yukleyenId: string
+  zaman: ISODateString
+}
+
+/** İVD kesinti satırı: kesintiyi yapan (mükellef) VKN'si, dönem, matrah ve kesilen vergi */
+export interface KesintiKaydi {
+  id: string
+  iceAktarimId: string
+  vkn: string
+  unvan: string
+  /** "2026-03" */
+  donem: string
+  matrah: number
+  kesinti: number
+}
+
+// --- e-Tebligat -------------------------------------------------------------------
+
+export type TebligatKurum = "GIB" | "SGK"
+export type TebligatTur =
+  | "ODEME_EMRI"
+  | "VERGI_CEZA_IHBARNAMESI"
+  | "IZAHA_DAVET"
+  | "BILGI_ISTEME"
+  | "INCELEME"
+  | "DIGER"
+/** YENI/INCELENDI açık sayılır; süre takibi yalnızca açık tebligatlarda yapılır */
+export type TebligatDurum = "YENI" | "INCELENDI" | "ISLEM_YAPILDI" | "KAPANDI"
+
+/**
+ * e-Tebligat kaydı. GİB/SGK bildirim e-postası posta kutusundan okunup ayrıştırılarak ya da elle
+ * oluşturulur. Tebliğ tarihi, son işlem günü ve kalan gün saklanmaz; ulaşma tarihinden türetilir.
+ */
+export interface Tebligat {
+  id: string
+  /** VKN/TCKN bir mükellefle eşleşmezse boş; "Eşleşmeyen" listesinde elle atanır */
+  mukellefId?: string
+  vkn: string
+  kurum: TebligatKurum
+  tur: TebligatTur
+  konu: string
+  belgeNo?: string
+  /** Belgenin elektronik adrese ulaştığı an */
+  ulasmaTarihi: ISODateString
+  /** Türün varsayılan süresi yerine yazıda belirtilen süre (gün) */
+  sureGun?: number
+  durum: TebligatDurum
+  atananId?: string
+  gorevId?: string
+  arsivDosyaId?: string
+  not?: string
+  kaynak: "EPOSTA" | "ELLE"
+  /** Posta kutusundaki mesajın kimliği — aynı e-posta iki kez kaydedilmez */
+  epostaMesajId?: string
+  olusturmaTarihi: ISODateString
+}
+
+export type PostaKutusuDurumu = "BAGLI" | "HATA" | "BAGLI_DEGIL"
+
+/**
+ * Tebligat bildirimlerinin düştüğü IMAP kutusu (büro başına bir kayıt). Şifre yalnızca backend'de
+ * saklanır; istemci ve mock DB son 4 karakteri (`sifreIpucu`) görür.
+ */
+export interface TebligatPostaKutusu {
+  id: string
+  durum: PostaKutusuDurumu
+  sunucu: string
+  port: number
+  kullanici: string
+  klasor: string
+  sifreIpucu?: string
+  /** Son okunan mesajın IMAP UID'si (artımlı tarama) */
+  sonUid: number
+  sonTarama?: ISODateString
+  hataMesaji?: string
+  baglayanId?: string
+  baglanmaTarihi?: ISODateString
+}
+
+// --- Gönderim kanalları ------------------------------------------------------------
+
+export type KanalTip = "EPOSTA" | "TELEGRAM" | "WHATSAPP"
+export type KanalDurumu = "BAGLI" | "HATA" | "YAPILANDIRILMADI"
+/** WhatsApp Business'ta her mesaj türü Meta'da onaylı bir şablona eşlenir */
+export type WhatsappSablon = MesajSablonTip | "PERSONEL_HATIRLATMA"
+
+interface KanalAyariTemel {
+  /** = tip (büro başına kanal başına bir kayıt) */
+  id: KanalTip
+  aktif: boolean
+  durum: KanalDurumu
+  /** Şifre / token'ın son 4 karakteri; kendisi yalnızca backend'de (KMS) */
+  gizliIpucu?: string
+  sonTest?: ISODateString
+  hataMesaji?: string
+  guncelleyenId?: string
+  guncellemeTarihi?: ISODateString
+}
+
+export interface EpostaKanalAyari extends KanalAyariTemel {
+  tip: "EPOSTA"
+  sunucu: string
+  port: number
+  guvenlik: "TLS" | "STARTTLS"
+  kullanici: string
+  gonderenAd: string
+  gonderenAdres: string
+}
+
+export interface TelegramKanalAyari extends KanalAyariTemel {
+  tip: "TELEGRAM"
+  /** "@PrimeOfisBot" — personel botla kendi sohbetini bağlar */
+  botKullaniciAdi: string
+}
+
+/** Meta WhatsApp Cloud API */
+export interface WhatsappKanalAyari extends KanalAyariTemel {
+  tip: "WHATSAPP"
+  telefonNumarasiId: string
+  wabaId: string
+  /** Mükelleflerin gördüğü numara, ör. "+90 216 345 67 89" */
+  gorunenNumara: string
+  /** Mesaj türü → onaylı Meta şablon adı */
+  sablonlar: Partial<Record<WhatsappSablon, string>>
+}
+
+export type KanalAyari =
+  EpostaKanalAyari | TelegramKanalAyari | WhatsappKanalAyari
+
+/** Personelin hangi bildirim kategorilerini hangi dış kanaldan alacağı. Uygulama içi her zaman açık. */
+export interface BildirimTercihi {
+  /** = personelId */
+  id: string
+  /** Kategori anahtarları `features/bildirim/gorunum.ts → BildirimKategori` */
+  kanallar: Partial<Record<string, KanalTip[]>>
+  telegramChatId?: string
+  /** Botla eşleştirme için tek kullanımlık kod (`/start <kod>`) */
+  telegramBaglamaKodu?: string
+}
+
+export type GonderimDurumu = "KUYRUKTA" | "GONDERILDI" | "HATA" | "ELLE"
+export type GonderimKaynak = "BILDIRIM" | "TALEP" | "TAHAKKUK" | "BORC" | "TEST"
+
+/**
+ * Dış kanal gönderim kaydı (outbox). Backend bu kayıtları kuyruktan işler, sonuç ve hatayı yazar.
+ * ELLE: kanal yapılandırılmadığı için bağlantı (wa.me / mailto) kullanıcıya açıldı.
+ */
+export interface Gonderim {
+  id: string
+  kanal: KanalTip
+  aliciTip: "PERSONEL" | "MUKELLEF"
+  aliciId: string
+  aliciAd: string
+  /** Maskeli adres: "ay***@firma.com", "+90 532 *** ** 67", "Telegram sohbeti" */
+  adres: string
+  konu: string
+  ozet: string
+  sablon?: WhatsappSablon
+  durum: GonderimDurumu
+  hataMesaji?: string
+  kaynak: GonderimKaynak
+  kaynakId?: string
+  gonderenId?: string
+  denemeSayisi: number
+  zaman: ISODateString
+}
+
+// ——— Fiş aktarımı (OCR → muhasebe fişi → Luca Excel) ———
+
+export type OkumaTur = "FIS" | "EKSTRE"
+export type OkumaDurum = "OKUNUYOR" | "OKUNDU" | "HATA"
+export type FisOdeme = "NAKIT" | "KART" | "VERESIYE"
+
+export interface KdvKirilimi {
+  /** Yüzde, ör. 20 */
+  oran: number
+  matrah: number
+  kdv: number
+}
+
+/** Fiş / fatura görselinden okunan alanlar */
+export interface FisOkumasi {
+  /** yyyy-MM-dd */
+  belgeTarihi: string
+  belgeNo: string
+  saticiUnvan: string
+  saticiVkn?: string
+  kdvKirilimi: KdvKirilimi[]
+  toplam: number
+  odeme: FisOdeme
+  /** 0–1; okuyucunun alanlardan emin olma derecesi */
+  guven: number
+}
+
+export interface EkstreHareketi {
+  /** yyyy-MM-dd */
+  tarih: string
+  aciklama: string
+  /** + hesaba giriş, − çıkış */
+  tutar: number
+}
+
+/** Banka ekstresinden okunan hareketler */
+export interface EkstreOkumasi {
+  banka: string
+  iban?: string
+  donemBas: string
+  donemSon: string
+  hareketler: EkstreHareketi[]
+}
+
+/** Onaylanan gelen evrakın okunması. Backend'de Claude ile yapılır (`fis-aktarimi/okuyucu.ts`). */
+export interface BelgeOkuma {
+  id: string
+  gelenId: string
+  arsivDosyaId?: string
+  mukellefId: string
+  tur: OkumaTur
+  durum: OkumaDurum
+  hataMesaji?: string
+  fis?: FisOkumasi
+  ekstre?: EkstreOkumasi
+  olusturmaTarihi: ISODateString
+}
+
+export type FisDurum = "TASLAK" | "ONAYLANDI" | "AKTARILDI"
+/** Luca "Belge Türü" kodu: EF e-Fatura, EA e-Arşiv fatura, MF muhasebe fişi */
+export type FisBelgeTuru = "EF" | "EA" | "MF"
+
+export interface FisSatiri {
+  hesapKodu: string
+  aciklama: string
+  borc: number
+  alacak: number
+  /** Karşı hesabı belirleyen anahtar (VKN / ekstre kelimesi); hesap değişince öğrenilir */
+  eslemeAnahtari?: string
+}
+
+/** Luca'ya aktarılacak mahsup fişi */
+export interface MuhasebeFisi {
+  id: string
+  mukellefId: string
+  okumaId: string
+  /** Önizleme için kaynak gelen evrak */
+  gelenId: string
+  arsivDosyaId?: string
+  /** yyyy-MM-dd */
+  tarih: string
+  aciklama: string
+  evrakNo?: string
+  evrakTarihi?: string
+  /** Yoksa MF */
+  belgeTuru?: FisBelgeTuru
+  satirlar: FisSatiri[]
+  durum: FisDurum
+  /** Okumadan gelen uyarılar (düşük güven, mükerrer, e-fatura…) */
+  uyarilar: string[]
+  /** Ekstre 400 satırı aşınca bölünür: "1/2" */
+  parca?: string
+  aktarimId?: string
+  onaylayanId?: string
+  onayTarihi?: ISODateString
+  olusturmaTarihi: ISODateString
+}
+
+export interface HesapEslemesi {
+  /** VKN ya da ekstre açıklamasında aranan kelime (büyük harf) */
+  anahtar: string
+  hesapKodu: string
+}
+
+/** Mükellef başına varsayılan hesaplar ve öğrenilen eşlemeler. id = mukellefId */
+export interface FisHesapAyari {
+  id: string
+  gider: string
+  /** KDV oranı → hesap, ör. { "20": "191.01.020" } */
+  kdv: Record<string, string>
+  kasa: string
+  banka: string
+  satici: string
+  eslemeler: HesapEslemesi[]
+}
+
+export type LucaSutunAlan =
+  | "FIS_NO"
+  | "FIS_TARIHI"
+  | "FIS_ACIKLAMA"
+  | "HESAP_KODU"
+  | "EVRAK_NO"
+  | "EVRAK_TARIHI"
+  | "DETAY_ACIKLAMA"
+  | "BORC"
+  | "ALACAK"
+  | "MIKTAR"
+  | "BELGE_TURU"
+  | "PARA_BIRIMI"
+  | "KUR"
+  | "DOVIZ_TUTAR"
+
+export interface LucaSutun {
+  alan: LucaSutunAlan
+  baslik: string
+}
+
+export interface LucaSablonAyari {
+  sutunlar: LucaSutun[]
+  /** date-fns biçimi, ör. "dd.MM.yyyy" */
+  tarihFormati: string
+  /** Her dosyada fiş numaraları bundan başlar */
+  baslangicFisNo: number
+}
+
+/** İndirilen bir Luca Excel dosyası */
+export interface LucaAktarim {
+  id: string
+  mukellefId: string
+  fisIdleri: string[]
+  dosyaAdi: string
+  olusturanId: string
+  tarih: ISODateString
+  geriAlindi?: boolean
 }

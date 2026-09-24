@@ -17,6 +17,17 @@ const SAYFALAR = [
   "/e-belge/e-fatura",
   "/e-belge/e-defter",
   "/e-belge/baglantilar",
+  "/tebligat",
+  "/tahsilat/ozet",
+  "/tahsilat/cari",
+  "/tahsilat/kesinti",
+  "/fis-aktarimi/taslaklar",
+  "/fis-aktarimi/hazir",
+  "/fis-aktarimi/aktarimlar",
+  "/ayarlar/luca",
+  "/ayarlar/kanallar",
+  "/ayarlar/bildirimler",
+  "/ayarlar/gonderimler",
   "/ayarlar/buro",
   "/ayarlar/personel",
   "/ayarlar/sablonlar",
@@ -64,7 +75,12 @@ test("375 px'te hiçbir sayfa yatay kaymaz; ana listeler kart gibi sığar", asy
   }
 
   await page.goto("/mukellefler")
-  await page.getByRole("table").getByRole("link").first().click()
+  // Dar ekranda mükellefler varsayılan olarak kart ızgarasında listelenir
+  await page
+    .getByRole("list", { name: "Mükellefler" })
+    .getByRole("link")
+    .first()
+    .click()
   await expect(page).toHaveURL(/\/genel$/)
   const kart = new URL(page.url()).pathname.replace(/\/genel$/, "")
   for (const sekme of ["genel", "sifreler", "takvim", "arsiv", "gorevler"]) {

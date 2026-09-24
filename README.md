@@ -1,6 +1,6 @@
 # Prime Ofis
 
-2-5 kişilik muhasebe büroları için mükellef, evrak ve görev takibi. Frontend şu an **mock API (MSW)** ile tamamen lokalde çalışır.
+2-5 kişilik muhasebe büroları için mükellef, evrak ve görev takibi. e-Belge işlemleri TÜRMOB-Luca e-Entegratör üzerinden yürür; tahakkuk fişleri ve mizanlar dosya ile içe aktarılır. Büronun kendi tahsilatı (aylık ücret, SMMM kesinti kontrolü), e-Tebligat takibi (bildirim e-postası taraması) ve e-posta / Telegram / WhatsApp Business ile hatırlatma ve mükellefe gönderim de dahildir (SMS yoktur). Frontend şu an **mock API (MSW)** ile tamamen lokalde çalışır.
 
 Geliştirme planı ve faz durumu: [.claude/FRONTEND_PLAN.md](.claude/FRONTEND_PLAN.md)
 
@@ -28,4 +28,4 @@ pnpm build
 
 ## Teknoloji
 
-React 19 · Vite 8 · TypeScript · Tailwind v4 · shadcn/ui (Base UI) · Hugeicons · React Router 8 · TanStack Query · Zustand · MSW 2 · Vitest · Playwright
+React 19 · Vite 8 · TypeScript · Tailwind v4 · shadcn/ui (Base UI) · Hugeicons · React Router 8 · TanStack Query · Zustand · MSW 2 · pdf.js · SheetJS · Vitest · Playwright

@@ -147,6 +147,8 @@ export const arsivHandlers = [
     const q = p.get("q")?.trim()
     const cop = p.get("cop") === "true"
     const sorumlu = p.get("sorumlu")
+    const gecerlilik = p.get("gecerlilik")
+    const bugunYmd = bugun()
     const siralaParam = p.get("sirala") as ArsivSiralama | null
     const sirala =
       siralaParam && SIRALAMALAR.includes(siralaParam) ? siralaParam : "ad"
@@ -161,7 +163,10 @@ export const arsivHandlers = [
         (d) =>
           d.silindi === cop &&
           ids.has(d.mukellefId) &&
-          (!kategori || d.kategori === kategori)
+          (!kategori || d.kategori === kategori) &&
+          (!gecerlilik ||
+            (d.gecerlilikTarihi !== undefined &&
+              gecerlilikDurumu(d.gecerlilikTarihi, bugunYmd) === gecerlilik))
       )
       .map(toView)
       .filter(

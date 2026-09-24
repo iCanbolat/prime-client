@@ -1,17 +1,22 @@
 import { HttpResponse, http } from "msw"
-import { addDays } from "date-fns"
+import { addDays, getISOWeek, getISOWeekYear } from "date-fns"
 
 import { gecerlilikDurumu, kalanGun } from "@/features/arsiv/kurallar"
 import { YANIT_UYARI_GUN } from "@/features/e-belge/kurallar"
 import { gecikmisMi } from "@/features/gorev/kurallar"
+import { formatTRY } from "@/lib/format"
 import { bugun, fromYmd, toYmd } from "@/lib/tarih"
 import { bildirimGorunurMu } from "@/mocks/bildirim-kurallari"
 import { db } from "@/mocks/db"
+import { bildirimGonderimleri } from "@/mocks/gonderim"
 import { api, notFound, requireActor } from "@/mocks/handlers/common"
 import { ebelgeView } from "@/mocks/handlers/e-belge"
+import { cariDurum } from "@/features/tahsilat/kurallar"
+import { sureDurumu } from "@/features/tebligat/kurallar"
+import { TEBLIGAT_TUR_ETIKET } from "@/features/tebligat/sabitler"
 import { olaylariHesapla } from "@/mocks/handlers/takvim"
 import type { BildirimListResponse, BildirimView } from "@/types/api"
-import type { Bildirim } from "@/types/domain"
+import type { Bildirim, CariHareket } from "@/types/domain"
 import { ARSIV_KATEGORI_ETIKET } from "@/types/domain"
 
 /** Belge geçerliliği için hatırlatma penceresi (gün): dolmadan önce ve dolduktan sonra */
@@ -134,8 +139,56 @@ export function hatirlatmalariUret(bugunYmd: string = bugun()) {
     })
   }
 
+  // Son işlem günü yaklaşan açık tebligatlar (≤ 3 gün)
+  for (const t of db.tebligat.all()) {
+    const d = sureDurumu(t, bugunYmd)
+    if (!d.acil) continue
+    const m = t.mukellefId ? db.mukellef.find(t.mukellefId) : undefined
+    ekle({
+      tur: "TEBLIGAT_SURE_YAKLASIYOR",
+      anahtar: `TEBLIGAT_SURE:${t.id}:${d.sonIslemTarihi}`,
+      aliciId: t.atananId ?? m?.sorumluPersonelId ?? null,
+      baslik:
+        d.kalanGun === 0
+          ? "e-Tebligat süresi bugün doluyor"
+          : `e-Tebligat süresinin dolmasına ${d.kalanGun} gün kaldı`,
+      aciklama: `${TEBLIGAT_TUR_ETIKET[t.tur]} · ${m?.unvan ?? `VKN ${t.vkn}`}`,
+      link: `/tebligat?tebligat=${t.id}`,
+      mukellefId: t.mukellefId,
+      hedefTip: "TEBLIGAT",
+      hedefId: t.id,
+    })
+  }
+
+  // Geciken ücret ödemeleri: yöneticilere haftada bir özet
+  const cariGrup = new Map<string, CariHareket[]>()
+  for (const h of db.cari.all())
+    cariGrup.set(h.mukellefId, [...(cariGrup.get(h.mukellefId) ?? []), h])
+  const gecikenler = [...cariGrup.entries()]
+    .map(([mukellefId, hs]) => ({ mukellefId, ...cariDurum(hs, bugunYmd) }))
+    .filter((d) => d.geciken)
+  if (gecikenler.length > 0) {
+    const bugunTarih = fromYmd(bugunYmd)
+    const hafta = `${getISOWeekYear(bugunTarih)}-W${getISOWeek(bugunTarih)}`
+    const toplam = gecikenler.reduce((t, d) => t + d.acikBorc, 0)
+    for (const y of db.personel.where((p) => p.aktif && p.rol === "YONETICI")) {
+      ekle({
+        tur: "ODEME_GECIKTI",
+        anahtar: `ODEME_GECIKTI:${y.id}:${hafta}`,
+        aliciId: y.id,
+        baslik: `${gecikenler.length} mükellefin ücret ödemesi gecikti`,
+        aciklama: `Vadesi geçmiş açık alacak ${formatTRY(toplam)}`,
+        link: "/tahsilat/cari?geciken=true",
+        hedefTip: "TAHSILAT",
+      })
+    }
+  }
+
   const zaman = new Date().toISOString()
-  for (const h of yeni) db.bildirim.insert({ ...h, zaman, okuyanlar: [] })
+  const eklenen = db.bildirim.insertMany(
+    yeni.map((h) => ({ ...h, zaman, okuyanlar: [] }))
+  )
+  db.gonderim.insertMany(eklenen.flatMap(bildirimGonderimleri))
 }
 
 function toView(b: Bildirim, kullaniciId: string): BildirimView {

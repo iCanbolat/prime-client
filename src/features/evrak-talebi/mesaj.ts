@@ -4,7 +4,7 @@
  */
 import { ISTENEN_EVRAKLAR } from "@/features/evrak-talebi/sabitler"
 import { formatDate, formatDonem } from "@/lib/format"
-import type { IstenenEvrak } from "@/types/domain"
+import type { IstenenEvrak, MesajSablonTip } from "@/types/domain"
 
 export const SABLON_DEGISKENLERI = [
   { ad: "unvan", aciklama: "Mükellef unvanı" },
@@ -14,11 +14,59 @@ export const SABLON_DEGISKENLERI = [
   { ad: "link", aciklama: "Yükleme bağlantısı" },
   { ad: "sonTarih", aciklama: "Son yükleme günü" },
   { ad: "neden", aciklama: "Red nedeni (red şablonu)" },
+  { ad: "beyan", aciklama: "Beyanname türü (ör. KDV)" },
+  { ad: "tutar", aciklama: "Ödenecek tutar" },
+  { ad: "vade", aciklama: "Son ödeme günü" },
+  { ad: "bakiye", aciklama: "Açık borç tutarı" },
+  { ad: "donemler", aciklama: "Borçlu dönemler" },
+  { ad: "iban", aciklama: "Büro IBAN'ı" },
 ] as const
 
-export type SablonDegiskenleri = Partial<
-  Record<(typeof SABLON_DEGISKENLERI)[number]["ad"], string>
->
+export type SablonDegiskenAdi = (typeof SABLON_DEGISKENLERI)[number]["ad"]
+export type SablonDegiskenleri = Partial<Record<SablonDegiskenAdi, string>>
+
+/** Şablon türüne göre kullanılabilen değişkenler ve zorunlu olan */
+export const SABLON_KURALLARI: Record<
+  MesajSablonTip,
+  { degiskenler: SablonDegiskenAdi[]; zorunlu?: SablonDegiskenAdi }
+> = {
+  TALEP: {
+    degiskenler: ["unvan", "buro", "donem", "evraklar", "link", "sonTarih"],
+    zorunlu: "link",
+  },
+  RED: {
+    degiskenler: [
+      "unvan",
+      "buro",
+      "donem",
+      "evraklar",
+      "link",
+      "sonTarih",
+      "neden",
+    ],
+    zorunlu: "link",
+  },
+  TAHAKKUK: {
+    degiskenler: ["unvan", "buro", "donem", "beyan", "tutar", "vade"],
+  },
+  BORC_HATIRLATMA: {
+    degiskenler: ["unvan", "buro", "bakiye", "donemler", "iban"],
+    zorunlu: "bakiye",
+  },
+}
+
+export const SABLON_TIPLERI = Object.keys(SABLON_KURALLARI) as MesajSablonTip[]
+
+/** Şablon metni doğrulaması; hata metni ya da null (istemci ve mock sunucu aynı kuralı kullanır) */
+export function sablonHatasi(tip: MesajSablonTip, metin: string | undefined) {
+  const m = metin?.trim()
+  if (!m) return "Şablon boş olamaz"
+  if (m.length > 1000) return "Şablon en fazla 1000 karakter olabilir"
+  const zorunlu = SABLON_KURALLARI[tip].zorunlu
+  if (zorunlu && !m.includes(`{${zorunlu}}`))
+    return `Şablon {${zorunlu}} değişkenini içermeli`
+  return null
+}
 
 /** `{degisken}` yer tutucularını doldurur; bilinmeyen/boş değişkenler olduğu gibi kalmaz, boşaltılır. */
 export function mesajOlustur(
@@ -81,9 +129,20 @@ export function whatsappLinki(telefon: string, mesaj: string): string | null {
     : null
 }
 
-export function smsLinki(telefon: string, mesaj: string): string | null {
-  const numara = telefonNormalize(telefon)
-  return numara ? `sms:+${numara}?body=${encodeURIComponent(mesaj)}` : null
+const EPOSTA_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function epostaGecerli(eposta: string | undefined): boolean {
+  return Boolean(eposta && EPOSTA_RE.test(eposta.trim()))
+}
+
+/** E-posta kanalı yapılandırılmamışsa kullanıcının e-posta istemcisinde açılır */
+export function epostaLinki(
+  eposta: string,
+  konu: string,
+  mesaj: string
+): string | null {
+  if (!epostaGecerli(eposta)) return null
+  return `mailto:${eposta.trim()}?subject=${encodeURIComponent(konu)}&body=${encodeURIComponent(mesaj)}`
 }
 
 export function portalLinki(

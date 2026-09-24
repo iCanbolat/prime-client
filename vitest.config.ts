@@ -10,6 +10,9 @@ export default mergeConfig(
       setupFiles: ["./src/test/setup.ts"],
       include: ["src/**/*.test.{ts,tsx}"],
       restoreMocks: true,
+      // Çok adımlı kullanıcı akışı testleri tek başına ~2 sn sürer; tüm dosyalar paralel koşarken
+      // CPU yükü bunu varsayılan 5 sn sınırının üstüne çıkarabiliyor
+      testTimeout: 15_000,
       coverage: {
         provider: "v8",
         include: ["src/**/*.{ts,tsx}"],

@@ -1,14 +1,17 @@
 import { HttpResponse, http } from "msw"
 
 import { db } from "@/mocks/db"
-import { api, errorResponse, notFound } from "@/mocks/handlers/common"
+import { api, errorResponse } from "@/mocks/handlers/common"
+import { sifreDogrula } from "@/mocks/personel-sifre"
 import type { LoginRequest, LoginResponse } from "@/types/api"
 
 export const authHandlers = [
   http.post<never, LoginRequest>(api("/auth/login"), async ({ request }) => {
-    const { personelId } = await request.json()
+    const { personelId, sifre } = await request.json()
     const personel = db.personel.find(personelId)
-    if (!personel) return notFound("Kullanıcı bulunamadı")
+    // Kullanıcı yok / şifre yanlış aynı yanıtı verir: hangi hesabın var olduğu sızmasın
+    if (!personel || !(await sifreDogrula(personelId, sifre ?? "")))
+      return errorResponse(401, "Kullanıcı veya şifre hatalı")
     if (!personel.aktif) return errorResponse(403, "Bu kullanıcı pasif durumda")
 
     db.aktivite.insert({

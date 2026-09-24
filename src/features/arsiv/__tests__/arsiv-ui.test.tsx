@@ -123,6 +123,39 @@ describe("Arşiv gezgini", () => {
   })
 })
 
+describe("Arşiv — panodan gelen filtreler", () => {
+  it("?gecerlilik=doldu yalnızca süresi dolan belgeleri listeler; rozet filtreyi kaldırır", async () => {
+    const { router, user } = renderRoute("/arsiv?gecerlilik=doldu", {
+      as: TEST_USERS.yonetici,
+    })
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("listitem", { name: /\.pdf$|\.png$/ })
+      ).toHaveLength(1)
+    )
+    await user.click(
+      screen.getByRole("button", { name: "Süresi dolmuş filtresini kaldır" })
+    )
+    expect(router.state.location.search).toBe("")
+    expect(
+      await screen.findAllByRole("listitem", { name: /\.pdf$|\.png$/ })
+    ).toHaveLength(8)
+  })
+
+  it("?eksik=1 eksik zorunlu evrakı olan mükellefleri listeler", async () => {
+    const { router, user } = renderRoute("/arsiv?eksik=1", {
+      as: TEST_USERS.yonetici,
+    })
+    const bolum = await screen.findByRole("region", {
+      name: "Eksik zorunlu evrakı olan mükellefler",
+    })
+    expect(within(bolum).getByText(/Çınar Yazılım/)).toBeInTheDocument()
+    expect(within(bolum).getByText("İmza sirküleri")).toBeInTheDocument()
+    await user.click(within(bolum).getByRole("button", { name: "Klasörü aç" }))
+    expect(router.state.location.search).toBe("?mukellef=m_ltd")
+  })
+})
+
 describe("Mükellef kartı → Arşiv", () => {
   it("Ltd mükellefte eksik imza sirküleri listelenir; yükleyince kaybolur", async () => {
     renderRoute("/mukellefler/m_ltd/arsiv", { as: TEST_USERS.yonetici })

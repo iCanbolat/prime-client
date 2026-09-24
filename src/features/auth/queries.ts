@@ -12,6 +12,34 @@ export function usePersonelList() {
   return useQuery({ queryKey: personelKeys.all, queryFn: authApi.personelList })
 }
 
+/** Personel yönetimi mutasyonları (Ayarlar → Personel); hepsi yönetici şifresi ister. */
+function usePersonelMutasyonu<TVars, TData>(
+  mutationFn: (vars: TVars) => Promise<TData>,
+  onData?: (data: TData) => void
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: (data) => {
+      onData?.(data)
+      return queryClient.invalidateQueries({ queryKey: personelKeys.all })
+    },
+  })
+}
+
+export const usePersonelOlustur = () =>
+  usePersonelMutasyonu(authApi.personelOlustur)
+export const usePersonelSifre = () =>
+  usePersonelMutasyonu(authApi.personelSifre)
+export const usePersonelSil = () => usePersonelMutasyonu(authApi.personelSil)
+
+export const usePersonelGuncelle = () =>
+  usePersonelMutasyonu(authApi.personelGuncelle, (personel) => {
+    // Yönetici kendi kaydını düzenlediyse oturumdaki kopya da güncellensin
+    const { user, setUser } = useAuthStore.getState()
+    if (user?.id === personel.id) setUser(personel)
+  })
+
 export function useLogin() {
   const setUser = useAuthStore((s) => s.setUser)
   return useMutation({

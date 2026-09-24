@@ -4,6 +4,7 @@
  * sorumlusu); atanan yoksa tüm kullanıcılara yayın. Aktör kendi eylemi için bildirim almaz.
  */
 import { db } from "@/mocks/db"
+import { bildirimGonderimleri } from "@/mocks/gonderim"
 import type { AktiviteLog, Bildirim, BildirimTur } from "@/types/domain"
 
 /** Bildirim üreten eylemler ve başlıkları; açıklama olarak log açıklaması kullanılır. */
@@ -19,7 +20,7 @@ const BASLIKLAR: Partial<Record<AktiviteLog["eylem"], string>> = {
   EFATURA_KABUL_EDILDI: "e-Fatura kabul edildi",
   EFATURA_REDDEDILDI: "e-Fatura reddedildi",
   EBELGE_SENKRONIZE_EDILDI: "e-Belge senkronu tamamlandı",
-  NILVERA_BAGLANTI_KALDIRILDI: "Nilvera bağlantısı kaldırıldı",
+  ENTEGRATOR_BAGLANTI_KALDIRILDI: "Luca bağlantısı kaldırıldı",
   ARSIV_YUKLENDI: "Arşive yeni dosya yüklendi",
   MUKELLEF_OLUSTURULDU: "Sorumlu olduğunuz yeni mükellef",
   BEYAN_DURUMU_GUNCELLENDI: "Beyan durumu güncellendi",
@@ -54,8 +55,16 @@ export function bildirimLinki(
       return mukellefId ? `/mukellefler/${mukellefId}/takvim` : "/takvim"
     case "CREDENTIAL":
       return mukellefId ? `/mukellefler/${mukellefId}/sifreler` : "/kasa"
+    case "TEBLIGAT":
+      return hedefId ? `/tebligat?tebligat=${hedefId}` : "/tebligat"
+    case "TAHSILAT":
+      return mukellefId ? `/mukellefler/${mukellefId}/tahsilat` : "/tahsilat"
     case "MUKELLEF":
       return mukellefId ? `/mukellefler/${mukellefId}` : "/mukellefler"
+    case "FIS":
+      return hedefId
+        ? `/fis-aktarimi/taslaklar?fis=${hedefId}`
+        : "/fis-aktarimi"
     default:
       return log.eylem === "SABLON_GUNCELLENDI"
         ? "/ayarlar/sablonlar"
@@ -68,6 +77,10 @@ export function aliciBul(log: AktiviteLog): string | null {
   if (log.hedefTip === "GOREV" && log.hedefId) {
     const g = db.gorev.find(log.hedefId)
     if (g) return g.atananId
+  }
+  if (log.hedefTip === "TEBLIGAT" && log.hedefId) {
+    const t = db.tebligat.find(log.hedefId)
+    if (t?.atananId) return t.atananId
   }
   if (log.hedefTip === "EVRAK" && log.hedefId) {
     const talepId = db.gelen.find(log.hedefId)?.talepId ?? log.hedefId
@@ -110,7 +123,7 @@ export function bildirimUret(
     zaman: log.zaman,
   }
 
-  return alicilar.flatMap((aliciId) => {
+  const eklenen = alicilar.flatMap((aliciId) => {
     // Kişiye özel bildirimde aktör kendine bildirim göndermez
     if (aliciId !== null && aliciId === log.aktorId) return []
     return [
@@ -122,6 +135,9 @@ export function bildirimUret(
       }),
     ]
   })
+  // Tercihe göre e-posta / Telegram / WhatsApp
+  db.gonderim.insertMany(eklenen.flatMap(bildirimGonderimleri))
+  return eklenen
 }
 
 /** Kullanıcının görebileceği bildirim mi? */

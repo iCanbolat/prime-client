@@ -20,13 +20,15 @@ export interface IstenenEvrakTanimi {
 export const ISTENEN_EVRAKLAR: Record<IstenenEvrak, IstenenEvrakTanimi> = {
   FIS_FATURA: {
     ad: "Aylık fiş / fatura",
-    kategori: "DIGER",
-    ipucu: "Alış ve satış fişleri, faturalar",
+    kategori: "FATURA",
+    ipucu:
+      "Alış ve satış fişleri, faturalar. Her fişi ayrı, düz ve tamamı okunacak şekilde çekin.",
   },
   BANKA_EKSTRESI: {
     ad: "Banka ekstresi",
-    kategori: "DIGER",
-    ipucu: "Dönemin tüm hesap hareketleri",
+    kategori: "BANKA_EKSTRESI",
+    ipucu:
+      "Dönemin tüm hesap hareketleri. İnternet şubesinden indirilen PDF'i tercih edin.",
   },
   KIRA_SOZLESMESI: { ad: "Kira sözleşmesi", kategori: "KIRA_SOZLESMESI" },
   KIMLIK: {
@@ -67,6 +69,7 @@ export const KATEGORIDEN_ISTENEN: Partial<Record<ArsivKategori, IstenenEvrak>> =
     KIRA_SOZLESMESI: "KIRA_SOZLESMESI",
     FAALIYET_BELGESI: "FAALIYET_BELGESI",
     KIMLIK: "KIMLIK",
+    BANKA_EKSTRESI: "BANKA_EKSTRESI",
     DIGER: "DIGER",
   }
 
@@ -78,7 +81,7 @@ export function kategorilerdenIstenen(
 
 export const KANAL_ETIKET: Record<TalepKanal, string> = {
   WHATSAPP: "WhatsApp",
-  SMS: "SMS",
+  EPOSTA: "E-posta",
   LINK: "Bağlantı",
 }
 
@@ -97,4 +100,8 @@ export const VARSAYILAN_SABLONLAR: Record<MesajSablonTip, string> = {
   TALEP:
     "Merhaba {unvan}, {buro} olarak {donem} dönemi için şu evraklara ihtiyacımız var: {evraklar}. Aşağıdaki bağlantıdan fotoğraf çekerek veya dosya seçerek yükleyebilirsiniz: {link} (Son gün: {sonTarih}). Teşekkürler.",
   RED: "Merhaba {unvan}, gönderdiğiniz evraklardan biri uygun değil: {neden}. Lütfen aynı bağlantıdan tekrar yükleyin: {link} (Son gün: {sonTarih}). {buro}",
+  TAHAKKUK:
+    "Merhaba {unvan}, {donem} dönemi {beyan} beyannamenizin tahakkuku ektedir. Ödenecek tutar {tutar}, son ödeme günü {vade}. {buro}",
+  BORC_HATIRLATMA:
+    "Merhaba {unvan}, {donemler} dönemlerine ait {bakiye} tutarındaki hizmet bedeli ödemeniz bulunmaktadır. IBAN: {iban}. Ödediyseniz bu mesajı dikkate almayınız. {buro}",
 }

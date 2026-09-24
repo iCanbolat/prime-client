@@ -1,5 +1,5 @@
 import { VARSAYILAN_SABLONLAR } from "@/features/evrak-talebi/sabitler"
-import type { Buro, Personel } from "@/types/domain"
+import type { Buro, Personel, PersonelKimlik } from "@/types/domain"
 
 /** Büro ve personel sabit tutulur: login ekranı ve testler bu kimliklere dayanır. */
 export const BURO: Buro = {
@@ -62,3 +62,19 @@ export const createBuro = (): Buro => ({
 })
 export const createPersonelList = (): Personel[] =>
   PERSONEL.map((p) => ({ ...p }))
+
+/** Demo ortamında tüm seed kullanıcılarının giriş şifresi. */
+export const DEMO_GIRIS_SIFRESI = "demo1234"
+
+/**
+ * `DEMO_GIRIS_SIFRESI`nin önceden hesaplanmış PBKDF2 özeti: seed senkron üretildiği için
+ * Web Crypto (async) burada çağrılamaz.
+ */
+const DEMO_KIMLIK: Omit<PersonelKimlik, "id"> = {
+  salt: "cHJpbWUtb2ZpczpzZWVkIQ==",
+  hash: "0UqX70DtzoX67FvWcbPu1+8o1ESk89otHpKtZx+OObk=",
+  iterations: 100_000,
+}
+
+export const createKimlikList = (): PersonelKimlik[] =>
+  PERSONEL.map((p) => ({ id: p.id, ...DEMO_KIMLIK }))

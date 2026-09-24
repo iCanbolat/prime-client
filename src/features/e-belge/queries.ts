@@ -14,6 +14,7 @@ import type {
   BeratListParams,
   EBelgeListParams,
   EFaturaYanitRequest,
+  KontorAlimRequest,
   SenkronRequest,
 } from "@/types/api"
 
@@ -30,6 +31,8 @@ export const eBelgeKeys = {
     [...eBelgeKeys.all, "berat", params] as const,
   ozet: (params: { sorumlu?: string }) =>
     [...eBelgeKeys.all, "ozet", params] as const,
+  kontor: (params: { donem?: string }) =>
+    [...eBelgeKeys.all, "kontor", params] as const,
 }
 
 export function useBaglantilar() {
@@ -76,6 +79,15 @@ export function useEBelgeOzet(params: { sorumlu?: string } = {}) {
     queryKey: eBelgeKeys.ozet(params),
     queryFn: () => eBelgeApi.ozet(params),
     refetchInterval: 60_000,
+  })
+}
+
+/** Tüketim senkronla gelen belgelerden hesaplandığı için senkron sonrası da tazelenir. */
+export function useKontor(params: { donem?: string } = {}) {
+  return useQuery({
+    queryKey: eBelgeKeys.kontor(params),
+    queryFn: () => eBelgeApi.kontor(params),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -136,6 +148,14 @@ export function useArsiveKaydet() {
   const invalidate = useInvalidate({ arsiv: true })
   return useMutation({
     mutationFn: eBelgeApi.arsiveKaydet,
+    onSuccess: invalidate,
+  })
+}
+
+export function useKontorAlimEkle() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: (body: KontorAlimRequest) => eBelgeApi.kontorAlimEkle(body),
     onSuccess: invalidate,
   })
 }

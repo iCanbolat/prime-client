@@ -3,12 +3,23 @@
  * böylece seed değişse de testler kırılmaz. Kullanım: `setDbState(createFixtureState())`.
  */
 import type { DbState } from "@/mocks/db"
-import { createBuro, createPersonelList } from "@/mocks/factories/personel"
+import {
+  createBuro,
+  createKimlikList,
+  createPersonelList,
+} from "@/mocks/factories/personel"
 import type {
+  BelgeOkuma,
+  MuhasebeFisi,
   ArsivDosya,
   EBelge,
   EDefterBerat,
-  NilveraBaglanti,
+  EntegratorBaglanti,
+  KontorAlim,
+  CariHareket,
+  Tebligat,
+  TebligatPostaKutusu,
+  KanalAyari,
   EvrakTalebi,
   GelenEvrak,
   Gorev,
@@ -202,7 +213,7 @@ export const FIXTURE_TALEPLER: EvrakTalebi[] = [
     id: "e_sure",
     mukellefId: "m_sahis",
     token: "tkn_sure",
-    kanal: "SMS",
+    kanal: "EPOSTA",
     istenenler: ["KIMLIK"],
     durum: "AKTIF",
     sonKullanma: "2026-09-10T20:59:59.000Z",
@@ -402,7 +413,7 @@ export const FIXTURE_GOREVLER: Gorev[] = [
 ]
 
 /** m_ltd bağlı (e-Fatura, e-Arşiv, e-Defter); m_as bağlantı hatalı; m_sahis bağlı değil. */
-export const FIXTURE_NILVERA: NilveraBaglanti[] = [
+export const FIXTURE_BAGLANTI: EntegratorBaglanti[] = [
   {
     id: "n_m_ltd",
     mukellefId: "m_ltd",
@@ -428,7 +439,7 @@ export const FIXTURE_NILVERA: NilveraBaglanti[] = [
     postaKutusu: "urn:mail:defaultpk@ozturkinsaat.com.tr",
     anahtarIpucu: "9qa1",
     sonSenkron: "2026-08-14T06:00:00.000Z",
-    hataMesaji: "Nilvera API anahtarı geçersiz veya süresi dolmuş (401)",
+    hataMesaji: "Luca web servis anahtarı geçersiz veya süresi dolmuş (401)",
     baglayanId: "p_1",
     baglanmaTarihi: "2025-01-10T09:00:00.000Z",
   },
@@ -587,11 +598,337 @@ export const FIXTURE_BERAT: EDefterBerat[] = [
   },
 ]
 
+/** Tek alım: 100 + 20 hediye = 120 kontör, 132 TL → birim 1,10 TL */
+export const FIXTURE_KONTOR: KontorAlim[] = [
+  {
+    id: "u_1",
+    tarih: "2026-05-01",
+    paketAdet: 100,
+    hediyeAdet: 20,
+    tutar: 132,
+    ekleyenId: "p_1",
+  },
+]
+
+/**
+ * Çınar Yazılım: aylık 10.000 TL brüt (KDV 2.000, stopaj 2.000 → net 10.000), 2026-07'den beri.
+ * Temmuz ödendi, Ağustos açık. Öztürk İnşaat: ücretsiz, tek ek hizmet borcu (açık).
+ */
+export const FIXTURE_UCRETLER: Record<string, Mukellef["ucret"]> = {
+  m_ltd: {
+    aylikBrut: 10_000,
+    kdvOrani: 20,
+    stopajVar: true,
+    baslangicDonem: "2026-07",
+  },
+}
+
+export const FIXTURE_CARI: CariHareket[] = [
+  {
+    id: "ch_1",
+    mukellefId: "m_ltd",
+    tip: "BORC",
+    kalem: "AYLIK_UCRET",
+    donem: "2026-07",
+    tarih: "2026-07-01",
+    brut: 10_000,
+    kdv: 2_000,
+    stopaj: 2_000,
+    tutar: 10_000,
+    aciklama: "Temmuz 2026 hizmet bedeli",
+    otomatikAnahtar: "UCRET:m_ltd:2026-07",
+    olusturanId: "sistem",
+    olusturmaTarihi: "2026-07-01T09:00:00.000Z",
+  },
+  {
+    id: "ch_2",
+    mukellefId: "m_ltd",
+    tip: "BORC",
+    kalem: "AYLIK_UCRET",
+    donem: "2026-08",
+    tarih: "2026-08-01",
+    brut: 10_000,
+    kdv: 2_000,
+    stopaj: 2_000,
+    tutar: 10_000,
+    aciklama: "Ağustos 2026 hizmet bedeli",
+    otomatikAnahtar: "UCRET:m_ltd:2026-08",
+    olusturanId: "sistem",
+    olusturmaTarihi: "2026-08-01T09:00:00.000Z",
+  },
+  {
+    id: "ch_3",
+    mukellefId: "m_ltd",
+    tip: "ODEME",
+    kalem: "ODEME",
+    tarih: "2026-07-15",
+    brut: 0,
+    kdv: 0,
+    stopaj: 0,
+    tutar: 10_000,
+    aciklama: "Havale",
+    kapatmalar: [{ borcId: "ch_1", tutar: 10_000 }],
+    olusturanId: "p_1",
+    olusturmaTarihi: "2026-07-15T09:00:00.000Z",
+  },
+  {
+    id: "ch_4",
+    mukellefId: "m_as",
+    tip: "BORC",
+    kalem: "EK_HIZMET",
+    tarih: "2026-06-10",
+    brut: 5_000,
+    kdv: 1_000,
+    stopaj: 1_000,
+    tutar: 5_000,
+    aciklama: "Ticaret sicil tadil tescili",
+    olusturanId: "p_1",
+    olusturmaTarihi: "2026-06-10T09:00:00.000Z",
+  },
+]
+
+/**
+ * Bugün 2026-09-23 kabulüyle: ödeme emri 2026-09-05'te ulaştı → tebliğ 09-10, son gün 09-25 (acil);
+ * izaha davet işlem gördü; eşleşmeyen VKN'li bir ödeme emri.
+ */
+export const FIXTURE_TEBLIGAT: Tebligat[] = [
+  {
+    id: "tb_acil",
+    mukellefId: "m_ltd",
+    vkn: "0174520662",
+    kurum: "GIB",
+    tur: "ODEME_EMRI",
+    konu: "KDV borcu ödeme emri",
+    belgeNo: "2026-00012345",
+    ulasmaTarihi: "2026-09-05T10:00:00.000Z",
+    durum: "YENI",
+    kaynak: "EPOSTA",
+    epostaMesajId: "<f-1@posta>",
+    olusturmaTarihi: "2026-09-05T10:00:00.000Z",
+  },
+  {
+    id: "tb_kapali",
+    mukellefId: "m_as",
+    vkn: "9358005601",
+    kurum: "GIB",
+    tur: "IZAHA_DAVET",
+    konu: "İzaha Davet Yazısı",
+    ulasmaTarihi: "2026-07-01T10:00:00.000Z",
+    durum: "ISLEM_YAPILDI",
+    atananId: "p_2",
+    not: "İzah dilekçesi verildi.",
+    kaynak: "EPOSTA",
+    epostaMesajId: "<f-2@posta>",
+    olusturmaTarihi: "2026-07-01T10:00:00.000Z",
+  },
+  {
+    id: "tb_eslesmeyen",
+    vkn: "4840847211",
+    kurum: "GIB",
+    tur: "ODEME_EMRI",
+    konu: "Ödeme Emri",
+    ulasmaTarihi: "2026-09-20T10:00:00.000Z",
+    durum: "YENI",
+    kaynak: "EPOSTA",
+    epostaMesajId: "<f-3@posta>",
+    olusturmaTarihi: "2026-09-20T10:00:00.000Z",
+  },
+]
+
+export const FIXTURE_POSTA_KUTUSU: TebligatPostaKutusu = {
+  id: "pk_1",
+  durum: "BAGLI",
+  sunucu: "imap.ornek.com",
+  port: 993,
+  kullanici: "tebligat@primemusavirlik.com.tr",
+  klasor: "INBOX",
+  sifreIpucu: "abcd",
+  sonUid: 10,
+  sonTarama: "2026-09-22T07:30:00.000Z",
+  baglayanId: "p_1",
+}
+
+/** Yalnızca e-posta kanalı bağlı; WhatsApp ve Telegram yapılandırılmamış */
+export const FIXTURE_KANAL: KanalAyari[] = [
+  {
+    id: "EPOSTA",
+    tip: "EPOSTA",
+    aktif: true,
+    durum: "BAGLI",
+    sunucu: "smtp.ornek.com",
+    port: 587,
+    guvenlik: "STARTTLS",
+    kullanici: "bildirim@primemusavirlik.com.tr",
+    gonderenAd: "Prime Mali Müşavirlik",
+    gonderenAdres: "bildirim@primemusavirlik.com.tr",
+    gizliIpucu: "wxyz",
+  },
+]
+
+/** Fiş aktarımı: m_as için okunmuş bir fiş (taslak), onaylı bir fiş ve hesabı eksik bir ekstre */
+export const FIXTURE_OKUMALAR: BelgeOkuma[] = [
+  {
+    id: "ok_fis",
+    gelenId: "g_onayli",
+    mukellefId: "m_as",
+    tur: "FIS",
+    durum: "OKUNDU",
+    fis: {
+      belgeTarihi: "2026-08-14",
+      belgeNo: "SH0012345",
+      saticiUnvan: "Shell Petrol A.Ş.",
+      saticiVkn: "7620039536",
+      kdvKirilimi: [{ oran: 20, matrah: 1000, kdv: 200 }],
+      toplam: 1200,
+      odeme: "KART",
+      guven: 0.95,
+    },
+    olusturmaTarihi: "2026-09-18T09:00:00.000Z",
+  },
+  {
+    id: "ok_ekstre",
+    gelenId: "g_onayli",
+    mukellefId: "m_as",
+    tur: "EKSTRE",
+    durum: "OKUNDU",
+    ekstre: {
+      banka: "Garanti BBVA",
+      donemBas: "2026-08-01",
+      donemSon: "2026-08-31",
+      hareketler: [
+        { tarih: "2026-08-05", aciklama: "SGK PRİM ÖDEMESİ", tutar: -5000 },
+        {
+          tarih: "2026-08-20",
+          aciklama: "EFT GELEN - DELTA YAZILIM",
+          tutar: 12000,
+        },
+      ],
+    },
+    olusturmaTarihi: "2026-09-18T09:00:00.000Z",
+  },
+]
+
+const fisBase = {
+  mukellefId: "m_as",
+  gelenId: "g_onayli",
+  uyarilar: [],
+  olusturmaTarihi: "2026-09-18T09:00:00.000Z",
+} satisfies Partial<MuhasebeFisi>
+
+export const FIXTURE_FISLER: MuhasebeFisi[] = [
+  {
+    ...fisBase,
+    id: "mf_taslak",
+    okumaId: "ok_fis",
+    tarih: "2026-08-14",
+    aciklama: "Shell Petrol A.Ş. SH0012345",
+    evrakNo: "SH0012345",
+    evrakTarihi: "2026-08-14",
+    satirlar: [
+      {
+        hesapKodu: "770.01",
+        aciklama: "Shell matrah %20",
+        borc: 1000,
+        alacak: 0,
+        eslemeAnahtari: "7620039536",
+      },
+      {
+        hesapKodu: "191.01.020",
+        aciklama: "Shell KDV %20",
+        borc: 200,
+        alacak: 0,
+      },
+      {
+        hesapKodu: "102.01",
+        aciklama: "Shell Petrol A.Ş.",
+        borc: 0,
+        alacak: 1200,
+      },
+    ],
+    durum: "TASLAK",
+  },
+  {
+    ...fisBase,
+    id: "mf_ekstre",
+    okumaId: "ok_ekstre",
+    tarih: "2026-08-20",
+    aciklama: "Garanti BBVA ekstresi 2026-08-01 – 2026-08-31",
+    evrakTarihi: "2026-08-31",
+    satirlar: [
+      {
+        hesapKodu: "102.01",
+        aciklama: "SGK PRİM ÖDEMESİ",
+        borc: 0,
+        alacak: 5000,
+      },
+      {
+        hesapKodu: "",
+        aciklama: "SGK PRİM ÖDEMESİ",
+        borc: 5000,
+        alacak: 0,
+        eslemeAnahtari: "SGK PRİM",
+      },
+      {
+        hesapKodu: "102.01",
+        aciklama: "EFT GELEN - DELTA YAZILIM",
+        borc: 12000,
+        alacak: 0,
+      },
+      {
+        hesapKodu: "120.01",
+        aciklama: "EFT GELEN - DELTA YAZILIM",
+        borc: 0,
+        alacak: 12000,
+        eslemeAnahtari: "DELTA YAZILIM",
+      },
+    ],
+    durum: "TASLAK",
+    uyarilar: ["1 hareketin karşı hesabı belirlenemedi"],
+  },
+  {
+    ...fisBase,
+    id: "mf_hazir",
+    okumaId: "ok_fis",
+    tarih: "2026-08-10",
+    aciklama: "Migros Ticaret A.Ş. MG0000777",
+    evrakNo: "MG0000777",
+    evrakTarihi: "2026-08-10",
+    satirlar: [
+      {
+        hesapKodu: "770.01",
+        aciklama: "Migros matrah %20",
+        borc: 500,
+        alacak: 0,
+      },
+      {
+        hesapKodu: "191.01.020",
+        aciklama: "Migros KDV %20",
+        borc: 100,
+        alacak: 0,
+      },
+      {
+        hesapKodu: "100.01",
+        aciklama: "Migros Ticaret A.Ş.",
+        borc: 0,
+        alacak: 600,
+      },
+    ],
+    durum: "ONAYLANDI",
+    onaylayanId: "p_2",
+    onayTarihi: "2026-09-19T09:00:00.000Z",
+  },
+]
+
 export function createFixtureState(): DbState {
   return {
     buro: [createBuro()],
     personel: createPersonelList(),
-    mukellef: structuredClone(FIXTURE_MUKELLEFLER),
+    kimlik: createKimlikList(),
+    mukellef: structuredClone(FIXTURE_MUKELLEFLER).map((m) =>
+      FIXTURE_UCRETLER[m.id]
+        ? { ...m, ucret: { ...FIXTURE_UCRETLER[m.id]! } }
+        : m
+    ),
     aktivite: [],
     credential: [],
     kasa: [],
@@ -600,9 +937,24 @@ export function createFixtureState(): DbState {
     talep: structuredClone(FIXTURE_TALEPLER),
     gelen: structuredClone(FIXTURE_GELENLER),
     gorev: structuredClone(FIXTURE_GOREVLER),
-    nilvera: structuredClone(FIXTURE_NILVERA),
+    baglanti: structuredClone(FIXTURE_BAGLANTI),
     ebelge: structuredClone(FIXTURE_EBELGE),
     berat: structuredClone(FIXTURE_BERAT),
+    kontor: structuredClone(FIXTURE_KONTOR),
+    tahakkuk: [],
+    mizan: [],
     bildirim: [],
+    cari: structuredClone(FIXTURE_CARI),
+    kesintiAktarim: [],
+    kesinti: [],
+    tebligat: structuredClone(FIXTURE_TEBLIGAT),
+    postaKutusu: [structuredClone(FIXTURE_POSTA_KUTUSU)],
+    kanal: structuredClone(FIXTURE_KANAL),
+    bildirimTercihi: [],
+    gonderim: [],
+    okuma: structuredClone(FIXTURE_OKUMALAR),
+    fis: structuredClone(FIXTURE_FISLER),
+    fisHesapAyari: [],
+    lucaAktarim: [],
   }
 }
