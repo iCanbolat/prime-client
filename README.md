@@ -16,7 +16,7 @@ pnpm test:e2e       # Playwright: iş akışları, erişilebilirlik (axe), klavy
                     # ilk kez: pnpm exec playwright install chromium
 pnpm typecheck
 pnpm lint
-pnpm build
+pnpm build && pnpm preview   # production build, mock API dahil (http://localhost:4173)
 ```
 
 ## Mock veri
@@ -24,7 +24,11 @@ pnpm build
 - Veriler tarayıcıda `localStorage`'da tutulur (seed = 42, 40 mükellef, 4 personel).
 - **Şifre kasası demo ana şifresi: `demo1234`** (kasa ilk açıldığında örnek şifreli kayıtlar oluşturulur).
 - **Ayarlar → Geliştirici**: veritabanını sıfırlama, ağ gecikmesini açıp kapatma, belirli bir API yolu için 500 hatası simülasyonu.
-- Production build'de mock API'yi açmak için: `VITE_ENABLE_MOCKS=true pnpm build`.
+- Gerçek backend henüz olmadığı için production build'de de mock API açıktır (`.env.production` → `VITE_ENABLE_MOCKS=true`). Backend bağlanınca bu satırı kaldırın veya ortam değişkenini `false` yapın.
+
+## Vercel demo
+
+`vercel.json` hazırdır: repoyu Vercel'e bağlamak yeterlidir (framework Vite, pnpm, çıktı `dist`). Tüm yollar SPA için `index.html`'e yönlenir; `mockServiceWorker.js` önbelleğe alınmaz. Demo verisi her ziyaretçinin kendi tarayıcısında tutulur, ziyaretçiler birbirinin değişikliğini görmez.
 
 ## Teknoloji
 

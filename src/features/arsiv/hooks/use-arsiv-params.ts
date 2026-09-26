@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react"
 import { useSearchParams } from "react-router"
 
 import { KATEGORI_SIRASI } from "@/features/arsiv/kurallar"
+import { useIsDar } from "@/hooks/use-mobile"
 import type { ArsivListParams, ArsivSiralama, SiralamaYonu } from "@/types/api"
 import type { ArsivKategori } from "@/types/domain"
 
@@ -65,6 +66,7 @@ type ArsivParamPatch = Partial<{
  */
 export function useArsivParams() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const dar = useIsDar()
 
   const params = useMemo<ArsivParams>(() => {
     const kategori = searchParams.get("kategori") as ArsivKategori | null
@@ -77,13 +79,15 @@ export function useArsivParams() {
       q: searchParams.get("q") ?? "",
       sirala: sirala && SIRALAMALAR.includes(sirala) ? sirala : "ad",
       yon: searchParams.get("yon") === "desc" ? "desc" : "asc",
-      gorunum: searchParams.get("gorunum") === "liste" ? "liste" : "grid",
+      // Tablet ve altında tablo sığmaz: ızgara zorunlu
+      gorunum:
+        !dar && searchParams.get("gorunum") === "liste" ? "liste" : "grid",
       cop: searchParams.get("cop") === "1",
       gecerlilik: GECERLILIK_URL[searchParams.get("gecerlilik") ?? ""],
       eksik: searchParams.get("eksik") === "1",
       sayfa: Number.isInteger(sayfa) && sayfa > 0 ? sayfa : 1,
     }
-  }, [searchParams])
+  }, [searchParams, dar])
 
   const update = useCallback(
     (patch: ArsivParamPatch) => {

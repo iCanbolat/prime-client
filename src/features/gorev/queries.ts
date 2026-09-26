@@ -31,12 +31,11 @@ export const gorevKeys = {
     [...gorevKeys.all, "donem-plan", body] as const,
 }
 
-export function useGorevList(params: GorevListParams, enabled = true) {
+export function useGorevList(params: GorevListParams) {
   return useQuery({
     queryKey: gorevKeys.list(params),
     queryFn: () => gorevApi.list(params),
     placeholderData: keepPreviousData,
-    enabled,
   })
 }
 

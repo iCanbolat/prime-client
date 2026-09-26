@@ -2,7 +2,11 @@ import { useCallback, useMemo, useState } from "react"
 import { toast } from "sonner"
 import type { RowSelectionState } from "@tanstack/react-table"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Add01Icon, UserGroupIcon } from "@hugeicons/core-free-icons"
+import {
+  Add01Icon,
+  FileImportIcon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons"
 
 import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState, ErrorState } from "@/components/shared/query-states"
@@ -109,14 +113,25 @@ export function MukellefListPage() {
         title="Mükellefler"
         description="Büronuzun takip ettiği şahıs ve şirketler"
         actions={
-          <ButtonLink to="/mukellefler/yeni">
-            <HugeiconsIcon
-              icon={Add01Icon}
-              data-icon="inline-start"
-              strokeWidth={2}
-            />
-            Yeni mükellef
-          </ButtonLink>
+          <>
+            <ButtonLink variant="outline" to="/ice-aktarim/mukellefler">
+              <HugeiconsIcon
+                icon={FileImportIcon}
+                data-icon="inline-start"
+                strokeWidth={2}
+              />
+              <span className="hidden sm:inline">Excel'den içe aktar</span>
+              <span className="sm:hidden">İçe aktar</span>
+            </ButtonLink>
+            <ButtonLink to="/mukellefler/yeni">
+              <HugeiconsIcon
+                icon={Add01Icon}
+                data-icon="inline-start"
+                strokeWidth={2}
+              />
+              Yeni mükellef
+            </ButtonLink>
+          </>
         }
       />
 
@@ -142,7 +157,7 @@ export function MukellefListPage() {
           description={
             hasFilters
               ? "Arama veya filtreleri değiştirmeyi deneyin."
-              : "İlk mükellefinizi ekleyerek başlayın."
+              : "Mevcut listenizi Excel'den aktarın veya ilk mükellefinizi ekleyin."
           }
           action={
             hasFilters ? (
@@ -150,7 +165,14 @@ export function MukellefListPage() {
                 Filtreleri temizle
               </Button>
             ) : (
-              <ButtonLink to="/mukellefler/yeni">Yeni mükellef</ButtonLink>
+              <div className="flex flex-wrap justify-center gap-2">
+                <ButtonLink to="/ice-aktarim/mukellefler">
+                  Excel'den içe aktar
+                </ButtonLink>
+                <ButtonLink variant="outline" to="/mukellefler/yeni">
+                  Yeni mükellef
+                </ButtonLink>
+              </div>
             )
           }
         />

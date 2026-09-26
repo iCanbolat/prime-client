@@ -2,7 +2,6 @@ import { useMemo, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
-  Analytics01Icon,
   KanbanIcon,
   ListViewIcon,
   TaskAdd01Icon,
@@ -10,6 +9,7 @@ import {
 
 import { PageHeader } from "@/components/shared/page-header"
 import { EmptyState, ErrorState } from "@/components/shared/query-states"
+import { Sayfalama } from "@/components/shared/sayfalama"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -24,13 +24,14 @@ import {
   type GorevHedef,
 } from "@/features/gorev/components/gorev-form-dialog"
 import { GorevTablosu } from "@/features/gorev/components/gorev-tablosu"
-import { HizliSorguKarti } from "@/features/gorev/components/hizli-sorgu-karti"
-import { IsYukuKarti } from "@/features/gorev/components/is-yuku-karti"
 import { KanbanPanosu } from "@/features/gorev/components/kanban-panosu"
 import { useGorevParams } from "@/features/gorev/hooks/use-gorev-params"
 import { useGorevTasiIslemi } from "@/features/gorev/hooks/use-gorev-tasi"
 import { useGorevList } from "@/features/gorev/queries"
-import { KANBAN_YUKSEKLIGI } from "@/features/gorev/sabitler"
+import {
+  GOREV_SAYFA_BOYUTU,
+  KANBAN_YUKSEKLIGI,
+} from "@/features/gorev/sabitler"
 import { useGorevTercihleri, type GorevGorunum } from "@/features/gorev/store"
 import { useIsDar } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -41,7 +42,6 @@ const GORUNUMLER: Record<
 > = {
   kanban: { ad: "Kanban", icon: KanbanIcon },
   liste: { ad: "Liste", icon: ListViewIcon },
-  ozet: { ad: "Özet", icon: Analytics01Icon },
 }
 
 function GorunumSecici({
@@ -88,7 +88,7 @@ export function GorevlerPage() {
   const { params, sorgu, update, filtreVar } = useGorevParams(user?.id)
   const gorunum = useGorevTercihleri((s) => s.gorunum)
   const setGorunum = useGorevTercihleri((s) => s.setGorunum)
-  const liste = useGorevList(sorgu, gorunum !== "ozet")
+  const liste = useGorevList(sorgu)
   const personel = usePersonelList()
   const { onTasi, tamamlayabilirMi } = useGorevTasiIslemi()
   const [yeniHedef, setYeniHedef] = useState<GorevHedef | null>(null)
@@ -100,6 +100,22 @@ export function GorevlerPage() {
     [personel.data]
   )
   const ac = (id: string) => update({ gorev: id })
+
+  // Liste görünümü istemci taraflı sayfalanır; toplu işlem/filtre sonrası
+  // liste kısalırsa son sayfaya sıkıştırılır
+  const toplam = liste.data?.length ?? 0
+  const sayfa = Math.min(
+    params.sayfa,
+    Math.max(Math.ceil(toplam / GOREV_SAYFA_BOYUTU), 1)
+  )
+  const sayfaGorevleri = useMemo(
+    () =>
+      (liste.data ?? []).slice(
+        (sayfa - 1) * GOREV_SAYFA_BOYUTU,
+        sayfa * GOREV_SAYFA_BOYUTU
+      ),
+    [liste.data, sayfa]
+  )
 
   return (
     <>
@@ -131,29 +147,11 @@ export function GorevlerPage() {
         }
       />
 
-      {gorunum !== "ozet" ? (
-        <GorevFiltreleri kullaniciId={user?.id}>
-          <GorunumSecici value={gorunum} onChange={setGorunum} />
-        </GorevFiltreleri>
-      ) : (
-        <div className="flex justify-end">
-          <GorunumSecici value={gorunum} onChange={setGorunum} />
-        </div>
-      )}
+      <GorevFiltreleri kullaniciId={user?.id}>
+        <GorunumSecici value={gorunum} onChange={setGorunum} />
+      </GorevFiltreleri>
 
-      {gorunum === "ozet" ? (
-        <div className="@container">
-          <div className="grid items-start gap-4 @3xl:grid-cols-2">
-            <IsYukuKarti
-              onSec={(id) => {
-                setGorunum("liste")
-                update({ atanan: id })
-              }}
-            />
-            <HizliSorguKarti onGorevAc={ac} />
-          </div>
-        </div>
-      ) : liste.isError ? (
+      {liste.isError ? (
         <ErrorState error={liste.error} onRetry={() => liste.refetch()} />
       ) : !liste.data ? (
         <PanoIskeleti />
@@ -175,31 +173,44 @@ export function GorevlerPage() {
           onAc={ac}
           onTasi={onTasi}
         />
-      ) : dar ? (
-        // Dar ekranda liste görünümü kart ızgarasına döner
-        <ul
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-          role="list"
-          aria-label="Görevler"
-        >
-          {liste.data.map((g) => (
-            <li key={g.id}>
-              <GorevKarti
-                gorev={g}
-                atanan={personelById.get(g.atananId)}
-                tamamlayabilir={tamamlayabilirMi(g)}
-                onAc={ac}
-                onTasi={onTasi}
-              />
-            </li>
-          ))}
-        </ul>
       ) : (
-        <GorevTablosu
-          gorevler={liste.data}
-          personelById={personelById}
-          onAc={ac}
-        />
+        <div className="grid gap-3">
+          {dar ? (
+            // Dar ekranda liste görünümü kart ızgarasına döner
+            <ul
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+              role="list"
+              aria-label="Görevler"
+            >
+              {sayfaGorevleri.map((g) => (
+                <li key={g.id}>
+                  <GorevKarti
+                    gorev={g}
+                    atanan={personelById.get(g.atananId)}
+                    tamamlayabilir={tamamlayabilirMi(g)}
+                    onAc={ac}
+                    onTasi={onTasi}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <GorevTablosu
+              gorevler={sayfaGorevleri}
+              personelById={personelById}
+              onAc={ac}
+            />
+          )}
+          {toplam > GOREV_SAYFA_BOYUTU && (
+            <Sayfalama
+              total={toplam}
+              sayfa={sayfa}
+              sayfaBoyutu={GOREV_SAYFA_BOYUTU}
+              birim="görevden"
+              onChange={(s) => update({ sayfa: s })}
+            />
+          )}
+        </div>
       )}
 
       <GorevDetaySheet

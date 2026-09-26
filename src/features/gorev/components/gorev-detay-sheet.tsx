@@ -231,7 +231,7 @@ function YorumMetni({
         i % 2 === 1 ? (
           <mark
             key={i}
-            className="rounded bg-primary/10 px-0.5 font-medium text-link"
+            className="rounded bg-blue-500/10 px-0.5 font-medium text-blue-600 dark:text-blue-400"
           >
             {p}
           </mark>

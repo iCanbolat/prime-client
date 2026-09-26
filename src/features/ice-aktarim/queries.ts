@@ -5,7 +5,13 @@ import { arsivKeys } from "@/features/arsiv/queries"
 import { gorevKeys } from "@/features/gorev/queries"
 import { iceAktarimApi } from "@/features/ice-aktarim/api"
 import { takvimKeys } from "@/features/takvim/queries"
-import type { MizanIceAktarRequest, TahakkukIceAktarRequest } from "@/types/api"
+import type {
+  AcilisTopluRequest,
+  CredentialTopluRequest,
+  MizanIceAktarRequest,
+  MukellefTopluRequest,
+  TahakkukIceAktarRequest,
+} from "@/types/api"
 
 export const iceAktarimKeys = {
   all: ["ice-aktarim"] as const,
@@ -67,3 +73,30 @@ export function useMizanAktar() {
     onSuccess: invalidate,
   })
 }
+
+/**
+ * Hızlı başlangıç aktarımları mükellef, kasa, takvim, tahsilat ve gösterge panelini birlikte
+ * etkiler; seyrek yapıldığı için tüm önbellek tazelenir.
+ */
+function useTopluAktarim<T>(
+  mutationFn: (body: T) => ReturnType<typeof iceAktarimApi.mukellefToplu>
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+}
+
+export const useMukellefTopluAktar = () =>
+  useTopluAktarim((body: MukellefTopluRequest) =>
+    iceAktarimApi.mukellefToplu(body)
+  )
+
+export const useSifreTopluAktar = () =>
+  useTopluAktarim((body: CredentialTopluRequest) =>
+    iceAktarimApi.sifreToplu(body)
+  )
+
+export const useAcilisTopluAktar = () =>
+  useTopluAktarim((body: AcilisTopluRequest) => iceAktarimApi.acilisToplu(body))

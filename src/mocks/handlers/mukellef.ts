@@ -15,6 +15,8 @@ import type {
   MukellefDurumFiltre,
   MukellefInput,
   MukellefListResponse,
+  MukellefTopluRequest,
+  TopluAktarimSonucu,
   TopluAtamaRequest,
 } from "@/types/api"
 import type { Mukellef, MukellefTur } from "@/types/domain"
@@ -185,6 +187,56 @@ export const mukellefHandlers = [
     })
     return HttpResponse.json(created, { status: 201 })
   }),
+
+  /** Hızlı başlangıç: Excel'den mükellefler. Kayıtlı VKN/TCKN atlanır, geçersiz satır raporlanır. */
+  http.post<never, MukellefTopluRequest>(
+    api("/mukellefler/toplu"),
+    async ({ request }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      const { kayitlar } = await request.json()
+      if (!Array.isArray(kayitlar) || kayitlar.length === 0)
+        return errorResponse(400, "Aktarılacak kayıt yok")
+      await ensureVault()
+
+      const sonuc: TopluAktarimSonucu = {
+        olusturulan: 0,
+        guncellenen: 0,
+        atlanan: 0,
+        hatalar: [],
+      }
+      for (const { satir, mukellef } of kayitlar) {
+        const input = normalizeInput(mukellef)
+        const invalid = validateMukellef(input)
+        if (invalid) {
+          if (invalid.status === 409) sonuc.atlanan++
+          else
+            sonuc.hatalar.push({
+              satir,
+              mesaj: ((await invalid.json()) as { message: string }).message,
+            })
+          continue
+        }
+        const created = db.mukellef.insert({
+          ...input,
+          olusturmaTarihi: new Date().toISOString(),
+        })
+        logActivity(
+          {
+            aktorId: actor.id,
+            eylem: "MUKELLEF_OLUSTURULDU",
+            hedefTip: "MUKELLEF",
+            hedefId: created.id,
+            mukellefId: created.id,
+            aciklama: `${created.unvan} (içe aktarım)`,
+          },
+          false
+        )
+        sonuc.olusturulan++
+      }
+      return HttpResponse.json(sonuc)
+    }
+  ),
 
   http.post<never, TopluAtamaRequest>(
     api("/mukellefler/toplu-atama"),

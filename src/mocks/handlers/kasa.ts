@@ -13,9 +13,11 @@ import type {
   CredentialCreateRequest,
   CredentialErisimRequest,
   CredentialKaydi,
+  CredentialTopluRequest,
   CredentialUpdateRequest,
   KasaMetaResponse,
   SonErisim,
+  TopluAktarimSonucu,
 } from "@/types/api"
 import type { Credential, Sistem } from "@/types/domain"
 
@@ -121,6 +123,81 @@ export const kasaHandlers = [
         aciklama: created.sistem,
       })
       return HttpResponse.json(toKaydi(created), { status: 201 })
+    }
+  ),
+
+  /**
+   * Hızlı başlangıç: Excel'den şifreler. İstemci her kaydı kasa anahtarıyla şifreler; sunucu
+   * yalnızca şifreli veriyi alır. Mevcut kayıt `uzerineYaz` ile güncellenir, yoksa atlanır.
+   */
+  http.post<never, CredentialTopluRequest>(
+    api("/kasa/credentials/toplu"),
+    async ({ request }) => {
+      await ensureVault()
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      const { uzerineYaz, kayitlar } = await request.json()
+      if (!Array.isArray(kayitlar) || kayitlar.length === 0)
+        return errorResponse(400, "Aktarılacak kayıt yok")
+
+      const sonuc: TopluAktarimSonucu = {
+        olusturulan: 0,
+        guncellenen: 0,
+        atlanan: 0,
+        hatalar: [],
+      }
+      const zaman = new Date().toISOString()
+      for (const k of kayitlar) {
+        const hata = !db.mukellef.find(k.mukellefId)
+          ? "Mükellef bulunamadı"
+          : !SISTEMLER.includes(k.sistem)
+            ? "Geçersiz sistem"
+            : !k.kullaniciAdi?.trim()
+              ? "Kullanıcı adı zorunludur"
+              : !isEncryptedPayload(k)
+                ? "Şifre şifrelenmiş olarak gönderilmelidir"
+                : null
+        if (hata) {
+          sonuc.hatalar.push({ satir: k.satir, mesaj: hata })
+          continue
+        }
+        const alanlar = {
+          kullaniciAdi: k.kullaniciAdi.trim(),
+          cipherText: k.cipherText,
+          iv: k.iv,
+          not: k.not?.trim() || undefined,
+          sonGuncelleme: zaman,
+          guncelleyenId: actor.id,
+        }
+        const mevcut = db.credential.where(
+          (c) => c.mukellefId === k.mukellefId && c.sistem === k.sistem
+        )[0]
+        if (mevcut && !uzerineYaz) {
+          sonuc.atlanan++
+          continue
+        }
+        const kayit = mevcut
+          ? db.credential.update(mevcut.id, alanlar)!
+          : db.credential.insert({
+              mukellefId: k.mukellefId,
+              sistem: k.sistem,
+              ...alanlar,
+            })
+        logActivity(
+          {
+            aktorId: actor.id,
+            eylem: mevcut ? "SIFRE_GUNCELLENDI" : "SIFRE_EKLENDI",
+            hedefTip: "CREDENTIAL",
+            hedefId: kayit.id,
+            mukellefId: kayit.mukellefId,
+            aciklama: `${kayit.sistem} (içe aktarım)`,
+          },
+          false
+        )
+        if (mevcut) sonuc.guncellenen++
+        else sonuc.olusturulan++
+      }
+      return HttpResponse.json(sonuc)
     }
   ),
 

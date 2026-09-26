@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils"
 const SEKMELER = [
   { to: "tahakkuk", label: "Tahakkuk fişleri" },
   { to: "mizan", label: "Mizan" },
+  { to: "mukellefler", label: "Mükellefler" },
+  { to: "sifreler", label: "Şifreler" },
+  { to: "bakiyeler", label: "Ücret ve bakiyeler" },
 ] as const
 
 export function IceAktarimLayout() {
@@ -13,7 +16,7 @@ export function IceAktarimLayout() {
     <>
       <PageHeader
         title="İçe Aktarım"
-        description="e-Beyanname tahakkuk fişleri ve muhasebe paketinden (Luca, Zirve, ETA…) alınan mizanlar"
+        description="Tahakkuk fişleri ve mizanlar; hızlı başlangıç için mevcut mükellefler, şifreler ve bakiyeler"
       />
       <nav
         aria-label="İçe aktarım bölümleri"

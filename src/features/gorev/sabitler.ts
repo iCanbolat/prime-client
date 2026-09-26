@@ -101,3 +101,6 @@ export const TAKVIM_SENKRON: Partial<Record<GorevDurum, BeyanDurumu>> = {
 
 /** Kanban panosu görünür alanı doldurur; sütunlar kendi içinde kayar (en az 26rem) */
 export const KANBAN_YUKSEKLIGI = "h-[max(26rem,calc(100svh-15rem))]"
+
+/** Liste görünümünde sayfa başına görev (istemci taraflı sayfalama) */
+export const GOREV_SAYFA_BOYUTU = 25

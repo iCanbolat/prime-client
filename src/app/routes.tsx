@@ -310,8 +310,9 @@ export const routes: RouteObject[] = [
             path: "tebligat",
             handle: crumb("e-Tebligat"),
             lazy: async () => ({
-              Component: (await import("@/features/tebligat/pages/tebligat-page"))
-                .TebligatPage,
+              Component: (
+                await import("@/features/tebligat/pages/tebligat-page")
+              ).TebligatPage,
             }),
           },
           {
@@ -337,8 +338,9 @@ export const routes: RouteObject[] = [
                 path: "cari",
                 handle: crumb("Cari hesaplar"),
                 lazy: async () => ({
-                  Component: (await import("@/features/tahsilat/pages/cari-page"))
-                    .CariPage,
+                  Component: (
+                    await import("@/features/tahsilat/pages/cari-page")
+                  ).CariPage,
                 }),
               },
               {
@@ -378,6 +380,33 @@ export const routes: RouteObject[] = [
                   Component: (
                     await import("@/features/ice-aktarim/pages/mizan-page")
                   ).MizanPage,
+                }),
+              },
+              {
+                path: "mukellefler",
+                handle: crumb("Mükellefler"),
+                lazy: async () => ({
+                  Component: (
+                    await import("@/features/ice-aktarim/pages/mukellef-aktarim-page")
+                  ).MukellefAktarimPage,
+                }),
+              },
+              {
+                path: "sifreler",
+                handle: crumb("Şifreler"),
+                lazy: async () => ({
+                  Component: (
+                    await import("@/features/ice-aktarim/pages/sifre-aktarim-page")
+                  ).SifreAktarimPage,
+                }),
+              },
+              {
+                path: "bakiyeler",
+                handle: crumb("Ücret ve bakiyeler"),
+                lazy: async () => ({
+                  Component: (
+                    await import("@/features/ice-aktarim/pages/bakiye-aktarim-page")
+                  ).BakiyeAktarimPage,
                 }),
               },
             ],

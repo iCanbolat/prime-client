@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sheet"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { ListeGorunum } from "@/hooks/use-liste-gorunumu"
+import { useIsDar } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 
 const ARAMA_GECIKMESI_MS = 300
@@ -252,7 +253,7 @@ export function FiltreSheet<T extends object>({
   )
 }
 
-/** Izgara / liste görünüm toggle'ı */
+/** Izgara / liste görünüm toggle'ı. Tablet ve altında ızgara zorunlu olduğundan gizlenir. */
 export function GorunumToggle({
   value,
   onChange,
@@ -260,6 +261,8 @@ export function GorunumToggle({
   value: ListeGorunum
   onChange: (g: ListeGorunum) => void
 }) {
+  const dar = useIsDar()
+  if (dar) return null
   return (
     <ToggleGroup
       variant="outline"

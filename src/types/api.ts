@@ -1197,3 +1197,37 @@ export interface FisHesapAyariResponse {
   /** Mükellefin defter türü fiş aktarımını destekliyor mu (şimdilik yalnızca bilanço) */
   destekli: boolean
 }
+
+// --- Toplu içe aktarım (hızlı başlangıç) -----------------------------------------
+
+/** Toplu aktarım sonucu. `satir`: Excel satır numarası (1 tabanlı) */
+export interface TopluAktarimSonucu {
+  olusturulan: number
+  guncellenen: number
+  atlanan: number
+  hatalar: { satir: number; mesaj: string }[]
+}
+
+export interface MukellefTopluRequest {
+  kayitlar: { satir: number; mukellef: MukellefInput }[]
+}
+
+export interface CredentialTopluRequest {
+  /** Mükellef + sistem için kayıt varsa güncellenir; yoksa atlanır */
+  uzerineYaz: boolean
+  kayitlar: (CredentialCreateRequest & { satir: number })[]
+}
+
+export interface AcilisKaydi {
+  satir: number
+  mukellefId: string
+  ucret?: MukellefUcret
+  /** + mükellef borçlu, − avans. `tarih`: yyyy-MM-dd */
+  bakiye?: { tutar: number; tarih: string }
+}
+
+export interface AcilisTopluRequest {
+  /** Tanımlı ücret varsa değiştirilir; açılış bakiyesi her mükellef için bir kez yazılır */
+  uzerineYaz: boolean
+  kayitlar: AcilisKaydi[]
+}

@@ -34,6 +34,7 @@ import {
 } from "@/mocks/handlers/common"
 import type {
   AcikBorcView,
+  AcilisTopluRequest,
   BuroGuncelleRequest,
   CariEkstreResponse,
   CariHareketView,
@@ -43,6 +44,7 @@ import type {
   KesintiIceAktarRequest,
   KesintiRaporResponse,
   TahsilatOzetResponse,
+  TopluAktarimSonucu,
   UcretKaydetRequest,
 } from "@/types/api"
 import type { CariHareket, Mukellef, MukellefUcret } from "@/types/domain"
@@ -440,6 +442,129 @@ export const tahsilatHandlers = [
         false
       )
       return new HttpResponse(null, { status: 204 })
+    }
+  ),
+
+  /**
+   * Hızlı başlangıç: aylık ücret + açılış bakiyesi. Açılış bakiyesi mükellef başına bir kez
+   * yazılır (tekrar aktarımda atlanır); tanımlı ücret yalnızca `uzerineYaz` ile değişir.
+   */
+  http.post<never, AcilisTopluRequest>(
+    api("/tahsilat/acilis-toplu"),
+    async ({ request }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      if (actor.rol !== "YONETICI")
+        return errorResponse(
+          403,
+          "Ücret ve bakiyeleri yalnızca yönetici aktarabilir"
+        )
+      const { uzerineYaz, kayitlar } = await request.json()
+      if (!Array.isArray(kayitlar) || kayitlar.length === 0)
+        return errorResponse(400, "Aktarılacak kayıt yok")
+
+      // Bugüne kadarki aylar mevcut ücretlerle kesinleşsin
+      ucretBorclariniUret()
+      const sonuc: TopluAktarimSonucu = {
+        olusturulan: 0,
+        guncellenen: 0,
+        atlanan: 0,
+        hatalar: [],
+      }
+      const zaman = new Date().toISOString()
+      for (const k of kayitlar) {
+        const m = db.mukellef.find(k.mukellefId)
+        const b = k.bakiye
+        const hata = !m
+          ? "Mükellef bulunamadı"
+          : (k.ucret && ucretDogrula(k.ucret)) ||
+            (b &&
+              (!TARIH_RE.test(b.tarih ?? "") ||
+                !Number.isFinite(b.tutar) ||
+                Math.abs(b.tutar) > MAKS_TUTAR) &&
+              "Açılış bakiyesi geçersiz") ||
+            null
+        if (!m || hata) {
+          sonuc.hatalar.push({
+            satir: k.satir,
+            mesaj: hata || "Geçersiz kayıt",
+          })
+          continue
+        }
+
+        let degisti = false
+        let yeniKayit = false
+        if (k.ucret && (!m.ucret || uzerineYaz)) {
+          const ucret: MukellefUcret = {
+            aylikBrut: yuvarla(k.ucret.aylikBrut),
+            kdvOrani: k.ucret.kdvOrani,
+            stopajVar: k.ucret.stopajVar,
+            baslangicDonem: k.ucret.baslangicDonem,
+          }
+          db.mukellef.update(m.id, { ucret })
+          logActivity(
+            {
+              aktorId: actor.id,
+              eylem: "UCRET_GUNCELLENDI",
+              hedefTip: "MUKELLEF",
+              hedefId: m.id,
+              mukellefId: m.id,
+              aciklama: `Aylık ${formatTRY(ucret.aylikBrut)} + KDV (içe aktarım)`,
+            },
+            false
+          )
+          degisti = true
+          yeniKayit ||= !m.ucret
+        }
+
+        const acilisVar = db.cari.count(
+          (h) => h.mukellefId === m.id && h.kalem === "ACILIS"
+        )
+        const tutar = b ? yuvarla(b.tutar) : 0
+        if (b && tutar !== 0 && acilisVar === 0) {
+          const borc = tutar > 0
+          const kayit = db.cari.insert({
+            mukellefId: m.id,
+            tip: borc ? "BORC" : "ODEME",
+            kalem: "ACILIS",
+            tarih: b.tarih,
+            brut: borc ? tutar : 0,
+            kdv: 0,
+            stopaj: 0,
+            tutar: Math.abs(tutar),
+            aciklama: "Açılış bakiyesi",
+            kapatmalar: borc
+              ? undefined
+              : fifoKapat(
+                  -tutar,
+                  acikBorclar(db.cari.where((h) => h.mukellefId === m.id))
+                ),
+            olusturanId: actor.id,
+            olusturmaTarihi: zaman,
+          })
+          if (borc) avansUygula(m.id)
+          logActivity(
+            {
+              aktorId: actor.id,
+              eylem: borc ? "TAHSILAT_BORC_EKLENDI" : "TAHSILAT_ODEME_ALINDI",
+              hedefTip: "TAHSILAT",
+              hedefId: kayit.id,
+              mukellefId: m.id,
+              aciklama: `Açılış bakiyesi · ${formatTRY(tutar)}`,
+            },
+            false
+          )
+          degisti = true
+          yeniKayit = true
+        }
+
+        if (!degisti) sonuc.atlanan++
+        else if (yeniKayit) sonuc.olusturulan++
+        else sonuc.guncellenen++
+      }
+      // Yeni ücretlerin başlangıç döneminden bugüne kadarki borçları
+      ucretBorclariniUret()
+      return HttpResponse.json(sonuc)
     }
   ),
 

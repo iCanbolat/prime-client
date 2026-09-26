@@ -13,12 +13,17 @@ type Patch = Partial<{
   geciken: boolean | null
   q: string | null
   gorev: string | null
+  sayfa: number | null
 }>
+
+/** Değişince liste başa döner; `gorev` (detay) ve `sayfa` sayfayı korur */
+const SAYFAYI_KORUYAN = new Set(["gorev", "sayfa"])
 
 /**
  * /gorevler?atanan=benim&mukellef=m_1&tip=KDV&tip=GECICI_VERGI&donem=2026-08&geciken=1&q=...&gorev=o_1
  * `atanan` tekrarlanabilir (herhangi birine atanmış görevler). `atanan=benim` oturumdaki kullanıcıya
  * çözülür (paylaşılan linkte herkes kendi görevini görür).
+ * `sayfa` yalnızca liste görünümünde, istemci taraflı sayfalama için kullanılır.
  */
 export function useGorevParams(kullaniciId: string | undefined) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -34,6 +39,7 @@ export function useGorevParams(kullaniciId: string | undefined) {
       geciken: searchParams.get("geciken") === "1",
       q: searchParams.get("q") ?? "",
       gorev: searchParams.get("gorev") ?? undefined,
+      sayfa: Math.max(Number(searchParams.get("sayfa")) || 1, 1),
     }
   }, [searchParams])
 
@@ -58,11 +64,15 @@ export function useGorevParams(kullaniciId: string | undefined) {
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current)
+          if (Object.keys(patch).some((k) => !SAYFAYI_KORUYAN.has(k)))
+            next.delete("sayfa")
           for (const [key, value] of Object.entries(patch)) {
             next.delete(key)
             if (Array.isArray(value)) value.forEach((v) => next.append(key, v))
             else if (value === true) next.set(key, "1")
-            else if (value) next.set(key, value)
+            else if (typeof value === "number") {
+              if (value > 1) next.set(key, String(value))
+            } else if (value) next.set(key, value)
           }
           return next
         },

@@ -4,12 +4,11 @@ import { createJSONStorage, persist } from "zustand/middleware"
 import { useIsDar } from "@/hooks/use-mobile"
 
 export type ListeGorunum = "grid" | "liste"
-type Ekran = "dar" | "genis"
 
 interface GorunumTercihleri {
-  /** sayfa anahtarı → ekran sınıfı → seçilen görünüm */
-  secimler: Record<string, Partial<Record<Ekran, ListeGorunum>>>
-  sec: (sayfa: string, ekran: Ekran, gorunum: ListeGorunum) => void
+  /** sayfa anahtarı → geniş ekranda seçilen görünüm */
+  secimler: Record<string, ListeGorunum>
+  sec: (sayfa: string, gorunum: ListeGorunum) => void
 }
 
 export const LISTE_GORUNUM_KEY = "prime-ofis:liste-gorunumu"
@@ -18,34 +17,37 @@ export const useGorunumTercihleri = create<GorunumTercihleri>()(
   persist(
     (set) => ({
       secimler: {},
-      sec: (sayfa, ekran, gorunum) =>
-        set((s) => ({
-          secimler: {
-            ...s.secimler,
-            [sayfa]: { ...s.secimler[sayfa], [ekran]: gorunum },
-          },
-        })),
+      sec: (sayfa, gorunum) =>
+        set((s) => ({ secimler: { ...s.secimler, [sayfa]: gorunum } })),
     }),
     {
       name: LISTE_GORUNUM_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ secimler: s.secimler }),
+      // v0: ekran sınıfı başına seçim ({ dar, genis }); yalnızca geniş ekran seçimi korunur
+      version: 1,
+      migrate: (kayit) => {
+        const eski = ((kayit ?? {}) as { secimler?: unknown }).secimler ?? {}
+        const secimler: Record<string, ListeGorunum> = {}
+        for (const [sayfa, v] of Object.entries(eski)) {
+          const genis = (v as { genis?: unknown } | null)?.genis
+          if (genis === "grid" || genis === "liste") secimler[sayfa] = genis
+        }
+        return { secimler }
+      },
     }
   )
 )
 
 /**
- * Liste/ızgara görünümü: tablet ve altında varsayılan ızgara, geniş ekranda liste.
- * Kullanıcının seçimi ekran sınıfı başına saklanır; masaüstünde yapılan seçim mobil varsayılanı bozmaz.
+ * Liste/ızgara görünümü: tablet ve altında (< 1024px) her zaman ızgara; tablo dar ekrana sığmaz.
+ * Geniş ekranda varsayılan liste, kullanıcının seçimi sayfa başına saklanır.
  */
 export function useListeGorunumu(
   sayfa: string
 ): [ListeGorunum, (g: ListeGorunum) => void] {
-  const ekran: Ekran = useIsDar() ? "dar" : "genis"
-  const secim = useGorunumTercihleri((s) => s.secimler[sayfa]?.[ekran])
+  const dar = useIsDar()
+  const secim = useGorunumTercihleri((s) => s.secimler[sayfa])
   const sec = useGorunumTercihleri((s) => s.sec)
-  return [
-    secim ?? (ekran === "dar" ? "grid" : "liste"),
-    (g) => sec(sayfa, ekran, g),
-  ]
+  return [dar ? "grid" : (secim ?? "liste"), (g) => sec(sayfa, g)]
 }

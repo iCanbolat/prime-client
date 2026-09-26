@@ -1,11 +1,15 @@
 import { http } from "@/lib/http"
 import type {
+  AcilisTopluRequest,
+  CredentialTopluRequest,
   MizanDetay,
   MizanIceAktarRequest,
   MizanView,
+  MukellefTopluRequest,
   TahakkukIceAktarRequest,
   TahakkukIceAktarResponse,
   TahakkukView,
+  TopluAktarimSonucu,
 } from "@/types/api"
 
 export const iceAktarimApi = {
@@ -20,4 +24,10 @@ export const iceAktarimApi = {
   mizan: (id: string) => http.get<MizanDetay>(`/ice-aktarim/mizanlar/${id}`),
   mizanAktar: (body: MizanIceAktarRequest) =>
     http.post<MizanView>("/ice-aktarim/mizanlar", body),
+  mukellefToplu: (body: MukellefTopluRequest) =>
+    http.post<TopluAktarimSonucu>("/mukellefler/toplu", body),
+  sifreToplu: (body: CredentialTopluRequest) =>
+    http.post<TopluAktarimSonucu>("/kasa/credentials/toplu", body),
+  acilisToplu: (body: AcilisTopluRequest) =>
+    http.post<TopluAktarimSonucu>("/tahsilat/acilis-toplu", body),
 }

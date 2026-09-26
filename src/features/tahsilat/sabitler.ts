@@ -8,6 +8,7 @@ export const KALEM_ETIKET: Record<CariKalem, string> = {
   EK_HIZMET: "Ek hizmet",
   ODEME: "Ödeme",
   DUZELTME: "Alacak düzeltmesi",
+  ACILIS: "Açılış bakiyesi",
 }
 
 export const KESINTI_DURUM_ETIKET: Record<KesintiDurum, string> = {

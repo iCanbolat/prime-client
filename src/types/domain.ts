@@ -647,7 +647,9 @@ export interface Mizan {
  * değildir. BORC: aylık ücret / ek hizmet; ODEME: tahsilat ya da alacak düzeltmesi (indirim).
  */
 export type CariHareketTip = "BORC" | "ODEME"
-export type CariKalem = "AYLIK_UCRET" | "EK_HIZMET" | "ODEME" | "DUZELTME"
+/** ACILIS: içe aktarımda devralınan bakiye (+ borç → BORC, avans → ODEME) */
+export type CariKalem =
+  "AYLIK_UCRET" | "EK_HIZMET" | "ODEME" | "DUZELTME" | "ACILIS"
 
 export interface Kapatma {
   borcId: string

@@ -1,7 +1,11 @@
 import { screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { GOREV_DURUM_SIRASI } from "@/features/gorev/sabitler"
+import {
+  GOREV_DURUM_SIRASI,
+  GOREV_SAYFA_BOYUTU,
+} from "@/features/gorev/sabitler"
+import { useGorevTercihleri } from "@/features/gorev/store"
 import { db } from "@/mocks/db"
 import { TEST_USERS, renderRoute } from "@/test/render"
 import type { GorevDurum } from "@/types/domain"
@@ -255,6 +259,45 @@ describe("Görevler — kanban", () => {
     await waitFor(() => expect(db.gorev.find("o_banka")?.atananId).toBe("p_4"))
     expect(db.gorev.find("o_vergi")?.atananId).toBe("p_4")
   })
+
+  it("liste görünümü sayfalanır; filtre değişince ilk sayfaya döner", async () => {
+    const ornek = db.gorev.find("o_banka")!
+    db.gorev.insertMany(
+      Array.from({ length: 30 }, (_, i) => ({
+        ...ornek,
+        id: `o_ek_${i}`,
+        baslik: `Ek görev ${i}`,
+      }))
+    )
+    const toplam = db.gorev.count()
+    useGorevTercihleri.setState({ gorunum: "liste" })
+    const { user } = renderRoute("/gorevler?sayfa=2", {
+      as: TEST_USERS.yonetici,
+    })
+
+    const tablo = await screen.findByRole("table", { name: "Görevler" })
+    const nav = screen.getByRole("navigation", { name: "Sayfalama" })
+    expect(within(nav).getByText("Sayfa 2 / 2")).toBeInTheDocument()
+    expect(within(tablo).getAllByRole("row")).toHaveLength(
+      toplam - GOREV_SAYFA_BOYUTU + 1
+    )
+
+    await user.click(within(nav).getByRole("button", { name: "Önceki" }))
+    await waitFor(() =>
+      expect(within(tablo).getAllByRole("row")).toHaveLength(
+        GOREV_SAYFA_BOYUTU + 1
+      )
+    )
+    await user.click(within(nav).getByRole("button", { name: "Sonraki" }))
+    expect(await within(nav).findByText("Sayfa 2 / 2")).toBeInTheDocument()
+
+    await user.type(screen.getByRole("searchbox"), "Ek görev")
+    await waitFor(() =>
+      expect(
+        screen.getByRole("navigation", { name: "Sayfalama" })
+      ).toHaveTextContent("Sayfa 1 / 2")
+    )
+  })
 })
 
 describe("Görev detayı", () => {
@@ -369,35 +412,30 @@ describe("Dönem görevleri ve diğer ekranlar", () => {
     ).toBeInTheDocument()
   })
 
-  it("özet görünümü: iş yükü ve hızlı sorgu", async () => {
-    db.takvim.insert({
-      id: "m_ltd:MUHTASAR_SGK:2026-08",
-      mukellefId: "m_ltd",
-      tip: "MUHTASAR_SGK",
-      donem: "2026-08",
-      durum: "HAZIRLANDI",
-      guncelleyenId: "p_3",
-      guncellemeTarihi: "2026-09-20T10:00:00Z",
+  it("atanan avatarları büro geneli iş yükünü gösterir", async () => {
+    const { user } = renderRoute("/gorevler?atanan=p_3", {
+      as: TEST_USERS.yonetici,
     })
-    const { user } = renderRoute("/gorevler", { as: TEST_USERS.yonetici })
-    await user.click(await screen.findByRole("button", { name: "Özet" }))
-
-    const isYuku = await screen.findByRole("list", { name: "Görev iş yükü" })
-    expect(
-      await within(isYuku).findByRole("button", {
-        name: "Mehmet Kaya: 3 açık, 1 gecikmiş görev",
-      })
-    ).toBeInTheDocument()
-
-    await user.click(
-      screen.getByRole("combobox", { name: "Sorgulanacak mükellef" })
+    const atananlar = await screen.findByRole("group", {
+      name: "Atanan kişiye göre filtrele",
+    })
+    // Filtre başka kişiyi seçse de sayılar büro genelidir
+    const mehmet = within(atananlar).getByRole("button", {
+      name: "Mehmet Kaya",
+    })
+    await waitFor(() =>
+      expect(mehmet).toHaveAccessibleDescription("3 açık, 1 gecikmiş görev")
     )
-    await user.click(await screen.findByRole("option", { name: /Çınar/ }))
-    const sonuc = await screen.findByRole("list", { name: "Sorgu sonucu" })
-    const muhtasar = await within(sonuc).findByText("Muhtasar ve prim hizmet")
-    const satir = muhtasar.closest("li")!
-    expect(within(satir).getByText("Hazırlandı")).toBeInTheDocument()
-    expect(within(satir).getByText("Kontrol")).toBeInTheDocument()
+    // Rozet yalnızca ilgili avatarın üzerine gelinince görünür
+    expect(within(mehmet).getByText("3")).toHaveClass(
+      "opacity-0",
+      "group-hover/avatar:opacity-100"
+    )
+    expect(
+      screen.queryByRole("button", { name: "Özet" })
+    ).not.toBeInTheDocument()
+    await user.click(mehmet)
+    expect(mehmet).toHaveAttribute("aria-pressed", "true")
   })
 
   it("gösterge panelinde geciken bağımsız görev Yapılacaklar'da", async () => {

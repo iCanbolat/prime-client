@@ -2,19 +2,19 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Alert02Icon,
-  CheckmarkCircle02Icon,
+  FileImportIcon,
   LockPasswordIcon,
   Search01Icon,
 } from "@hugeicons/core-free-icons"
 
+import { ButtonLink } from "@/components/shared/button-link"
+import { GorunumToggle } from "@/components/shared/liste-araclari"
 import { PageHeader } from "@/components/shared/page-header"
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from "@/components/shared/query-states"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardDescription,
@@ -35,40 +35,16 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { MukellefCredentialKartlari } from "@/features/kasa/components/credential-kartlari"
 import { KasaDurumUyarisi } from "@/features/kasa/components/kasa-kilidi"
+import { KasaKartlari } from "@/features/kasa/components/kasa-kartlari"
+import { KasaTablosu } from "@/features/kasa/components/kasa-tablosu"
+import { kasaSatirlari } from "@/features/kasa/matris"
 import { useCredentials } from "@/features/kasa/queries"
-import {
-  SISTEMLER,
-  SISTEM_SIRASI,
-  sistemGerekliMi,
-} from "@/features/kasa/sistemler"
-import { MukellefTurBadge } from "@/features/mukellef/components/mukellef-badges"
 import { useMukellefList } from "@/features/mukellef/queries"
+import { useListeGorunumu } from "@/hooks/use-liste-gorunumu"
 import { cn } from "@/lib/utils"
-import type { Mukellef, Sistem } from "@/types/domain"
-
-type HucreDurumu = "kayitli" | "eksik" | "gerekmez"
-
-interface Satir {
-  mukellef: Mukellef
-  hucreler: Record<Sistem, HucreDurumu>
-  eksikSayisi: number
-}
-
-const HUCRE_ETIKET: Record<HucreDurumu, string> = {
-  kayitli: "Kayıtlı",
-  eksik: "Eksik",
-  gerekmez: "Gerekmez",
-}
+import type { Mukellef } from "@/types/domain"
 
 function OzetKarti({
   label,
@@ -102,29 +78,15 @@ export function KasaPage() {
   const [arama, setArama] = useState("")
   const [yalnizcaEksik, setYalnizcaEksik] = useState(false)
   const [secili, setSecili] = useState<Mukellef | null>(null)
+  const [gorunum, setGorunum] = useListeGorunumu("kasa")
 
-  const satirlar = useMemo<Satir[]>(() => {
-    if (!mukellefler.data || !credentials.data) return []
-    const kayitli = new Set(
-      credentials.data.map((c) => `${c.mukellefId}:${c.sistem}`)
-    )
-    return mukellefler.data.items.map((m) => {
-      const hucreler = Object.fromEntries(
-        SISTEM_SIRASI.map((s) => [
-          s,
-          kayitli.has(`${m.id}:${s}`)
-            ? "kayitli"
-            : sistemGerekliMi(m, s)
-              ? "eksik"
-              : "gerekmez",
-        ])
-      ) as Record<Sistem, HucreDurumu>
-      const eksikSayisi = Object.values(hucreler).filter(
-        (h) => h === "eksik"
-      ).length
-      return { mukellef: m, hucreler, eksikSayisi }
-    })
-  }, [mukellefler.data, credentials.data])
+  const satirlar = useMemo(
+    () =>
+      mukellefler.data && credentials.data
+        ? kasaSatirlari(mukellefler.data.items, credentials.data)
+        : [],
+    [mukellefler.data, credentials.data]
+  )
 
   const ozet = useMemo(() => {
     let kayitli = 0
@@ -158,6 +120,16 @@ export function KasaPage() {
       <PageHeader
         title="Şifre Kasası"
         description="Aktif mükelleflerin GİB, İnteraktif VD, SGK ve e-Bildirge giriş bilgileri"
+        actions={
+          <ButtonLink variant="outline" to="/ice-aktarim/sifreler">
+            <HugeiconsIcon
+              icon={FileImportIcon}
+              strokeWidth={2}
+              data-icon="inline-start"
+            />
+            Excel'den içe aktar
+          </ButtonLink>
+        }
       />
       <KasaDurumUyarisi />
 
@@ -206,6 +178,9 @@ export function KasaPage() {
                 Yalnızca eksiği olanlar
               </FieldLabel>
             </Field>
+            <div className="ml-auto">
+              <GorunumToggle value={gorunum} onChange={setGorunum} />
+            </div>
           </div>
 
           {gorunenler.length === 0 ? (
@@ -217,78 +192,10 @@ export function KasaPage() {
                   : "Sonuç bulunamadı"
               }
             />
+          ) : gorunum === "grid" ? (
+            <KasaKartlari satirlar={gorunenler} onSec={setSecili} />
           ) : (
-            <div className="overflow-x-auto rounded-3xl border">
-              <Table aria-label="Şifre kasası tamamlanma tablosu">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mükellef</TableHead>
-                    {SISTEM_SIRASI.map((s) => (
-                      <TableHead key={s} className="text-center">
-                        {SISTEMLER[s].ad}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {gorunenler.map(({ mukellef, hucreler }) => (
-                    <TableRow key={mukellef.id}>
-                      <TableCell className="max-w-72">
-                        <div className="flex min-w-0 flex-col gap-1">
-                          <Link
-                            to={`/mukellefler/${mukellef.id}/sifreler`}
-                            className="truncate font-medium hover:underline"
-                          >
-                            {mukellef.unvan}
-                          </Link>
-                          <MukellefTurBadge tur={mukellef.tur} />
-                        </div>
-                      </TableCell>
-                      {SISTEM_SIRASI.map((s) => {
-                        const durum = hucreler[s]
-                        return (
-                          <TableCell key={s} className="text-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              aria-label={`${mukellef.unvan} ${SISTEMLER[s].ad}: ${HUCRE_ETIKET[durum]}`}
-                              onClick={() => setSecili(mukellef)}
-                              className={cn(
-                                durum === "eksik" &&
-                                  "text-amber-800 dark:text-amber-300",
-                                durum === "gerekmez" && "text-muted-foreground"
-                              )}
-                            >
-                              {durum === "kayitli" && (
-                                <HugeiconsIcon
-                                  icon={CheckmarkCircle02Icon}
-                                  strokeWidth={2}
-                                  className="text-emerald-600 dark:text-emerald-400"
-                                />
-                              )}
-                              {durum === "eksik" && (
-                                <HugeiconsIcon
-                                  icon={Alert02Icon}
-                                  strokeWidth={2}
-                                />
-                              )}
-                              <span
-                                className={cn(
-                                  durum === "kayitli" &&
-                                    "sr-only sm:not-sr-only"
-                                )}
-                              >
-                                {HUCRE_ETIKET[durum]}
-                              </span>
-                            </Button>
-                          </TableCell>
-                        )
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <KasaTablosu satirlar={gorunenler} onSec={setSecili} />
           )}
         </>
       )}

@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { createJSONStorage, persist } from "zustand/middleware"
 
-export type GorevGorunum = "kanban" | "liste" | "ozet"
+export type GorevGorunum = "kanban" | "liste"
 
 interface GorevTercihleri {
   gorunum: GorevGorunum
@@ -21,6 +21,12 @@ export const useGorevTercihleri = create<GorevTercihleri>()(
       name: GOREV_TERCIH_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ gorunum: s.gorunum }),
+      // v0'da "ozet" görünümü vardı; kaldırıldı
+      version: 1,
+      migrate: (kayit) => {
+        const { gorunum } = (kayit ?? {}) as { gorunum?: string }
+        return { gorunum: gorunum === "liste" ? "liste" : "kanban" }
+      },
     }
   )
 )
