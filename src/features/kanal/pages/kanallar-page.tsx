@@ -3,7 +3,6 @@ import { toast } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Mail01Icon,
-  MailReceive01Icon,
   TelegramIcon,
   WhatsappBusinessIcon,
 } from "@hugeicons/core-free-icons"
@@ -32,19 +31,12 @@ import {
   KANAL_ETIKET,
   WHATSAPP_SABLON_ETIKET,
 } from "@/features/kanal/sabitler"
-import { PostaKutusuDialog } from "@/features/tebligat/components/posta-kutusu-dialog"
-import {
-  usePostaKutusu,
-  usePostaKutusuKaldir,
-} from "@/features/tebligat/queries"
-import { POSTA_DURUM_ETIKET } from "@/features/tebligat/sabitler"
 import { formatDateTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type {
   KanalAyari,
   KanalDurumu,
   KanalTip,
-  PostaKutusuDurumu,
   WhatsappSablon,
 } from "@/types/domain"
 
@@ -62,11 +54,7 @@ const ACIKLAMA: Record<KanalTip, string> = {
     "Mükellefe onaylı şablonlarla WhatsApp mesajı (Meta, mesaj başına ücretli)",
 }
 
-function DurumBadge({ durum }: { durum: KanalDurumu | PostaKutusuDurumu }) {
-  const etiket =
-    durum in KANAL_DURUM_ETIKET
-      ? KANAL_DURUM_ETIKET[durum as KanalDurumu]
-      : POSTA_DURUM_ETIKET[durum as PostaKutusuDurumu]
+function DurumBadge({ durum }: { durum: KanalDurumu }) {
   return (
     <Badge
       variant="secondary"
@@ -74,11 +62,10 @@ function DurumBadge({ durum }: { durum: KanalDurumu | PostaKutusuDurumu }) {
         durum === "BAGLI" &&
           "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
         durum === "HATA" && "bg-destructive/10 text-destructive",
-        (durum === "YAPILANDIRILMADI" || durum === "BAGLI_DEGIL") &&
-          "bg-muted text-muted-foreground"
+        durum === "YAPILANDIRILMADI" && "bg-muted text-muted-foreground"
       )}
     >
-      {etiket}
+      {KANAL_DURUM_ETIKET[durum]}
     </Badge>
   )
 }
@@ -211,98 +198,6 @@ function KanalKarti({
   )
 }
 
-function PostaKutusuKarti() {
-  const kutu = usePostaKutusu()
-  const kaldir = usePostaKutusuKaldir()
-  const [acik, setAcik] = useState(false)
-  const [kaldirilacak, setKaldirilacak] = useState(false)
-  const k = kutu.data
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <HugeiconsIcon
-            icon={MailReceive01Icon}
-            strokeWidth={2}
-            className="size-5"
-          />
-          e-Tebligat posta kutusu
-        </CardTitle>
-        <CardDescription>
-          GİB/SGK tebligat bildirimlerinin düştüğü IMAP kutusu. İVD'de
-          mükelleflerin bildirim e-posta adresi bu kutu olmalı.
-        </CardDescription>
-        <CardAction>
-          <DurumBadge durum={k?.durum ?? "BAGLI_DEGIL"} />
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        {kutu.isPending ? (
-          <LoadingState />
-        ) : k ? (
-          <Satirlar
-            satirlar={[
-              ["Hesap", k.kullanici],
-              ["Sunucu", `${k.sunucu}:${k.port} · ${k.klasor}`],
-              ["Şifre", k.sifreIpucu ? `••••${k.sifreIpucu}` : "—"],
-              ["Son tarama", k.sonTarama ? formatDateTime(k.sonTarama) : "—"],
-            ]}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Bağlı değil; tebligatlar yalnızca elle girilebilir.
-          </p>
-        )}
-        {k?.hataMesaji && (
-          <p className="mt-2 text-sm text-destructive">{k.hataMesaji}</p>
-        )}
-      </CardContent>
-      <CardFooter className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant={k ? "outline" : "default"}
-          onClick={() => setAcik(true)}
-        >
-          {k ? "Düzenle" : "Bağla"}
-        </Button>
-        {k && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive"
-            onClick={() => setKaldirilacak(true)}
-          >
-            Kaldır
-          </Button>
-        )}
-      </CardFooter>
-      <PostaKutusuDialog
-        open={acik}
-        mevcut={k ?? null}
-        onClose={() => setAcik(false)}
-      />
-      <ConfirmDialog
-        open={kaldirilacak}
-        onOpenChange={setKaldirilacak}
-        title="Posta kutusu kaldırılsın mı?"
-        description="Yeni tebligat bildirimleri artık okunmaz. Kayıtlı tebligatlar silinmez."
-        confirmLabel="Kaldır"
-        destructive
-        pending={kaldir.isPending}
-        onConfirm={() =>
-          kaldir.mutate(undefined, {
-            onSuccess: () => {
-              toast.success("Posta kutusu kaldırıldı")
-              setKaldirilacak(false)
-            },
-            onError: (error) => toast.error(error.message),
-          })
-        }
-      />
-    </Card>
-  )
-}
-
 export function KanallarPage() {
   const kanallar = useKanallar()
   const kaldir = useKanalKaldir()
@@ -332,7 +227,6 @@ export function KanallarPage() {
             onKaldir={() => setKaldirilacak(tip)}
           />
         ))}
-        <PostaKutusuKarti />
       </div>
       <KanalDialog
         tip={duzenlenen}

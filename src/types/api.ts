@@ -43,7 +43,8 @@ import type {
   MukellefUcret,
   Tebligat,
   TebligatDurum,
-  TebligatPostaKutusu,
+  TebligatErisim,
+  TebligatTarama,
   TebligatTur,
   BildirimTercihi,
   Gonderim,
@@ -936,7 +937,7 @@ export type TebligatView = Tebligat &
     atananAd?: string
   }
 
-export type TebligatKapsam = "acik" | "acil" | "eslesmeyen" | "kapali"
+export type TebligatKapsam = "acik" | "acil" | "kapali"
 
 export interface TebligatListParams {
   kapsam?: TebligatKapsam
@@ -954,16 +955,26 @@ export interface TebligatListResponse {
   sayfaBoyutu: number
 }
 
+/** Aktif mükelleflerin GİB erişim durumu; `TANIMSIZ` olanlar gece taramasına girmez */
+export type TebligatErisimSatirDurumu = TebligatErisim["durum"] | "TANIMSIZ"
+
+export interface TebligatErisimSayilari {
+  aktif: number
+  hatali: number
+  tanimsiz: number
+}
+
 export interface TebligatOzetResponse {
   acik: number
   acil: number
   geciken: number
-  eslesmeyen: number
   /** Son 7 günde ulaşan */
   yeni: number
   /** Son işlem günü en yakın açık tebligatlar (en fazla 5) */
   yaklasan: TebligatView[]
-  postaKutusu: TebligatPostaKutusuView | null
+  /** Son gece taraması; henüz çalışmadıysa null */
+  sonTarama: TebligatTarama | null
+  erisim: TebligatErisimSayilari
 }
 
 export interface TebligatGuncelleRequest {
@@ -971,8 +982,6 @@ export interface TebligatGuncelleRequest {
   /** null: atama kaldırılır */
   atananId?: string | null
   not?: string
-  /** Eşleşmeyen tebligatı mükellefe bağlar */
-  mukellefId?: string
   /** null: türün varsayılan süresine döner */
   sureGun?: number | null
 }
@@ -992,24 +1001,29 @@ export interface TebligatBelgeRequest {
   dosya: IceAktarDosya
 }
 
-export interface TebligatTaraResponse {
-  okunan: number
-  yeni: number
-  eslesmeyen: number
-  /** Tebligat bildirimi olmayan e-postalar */
-  atlanan: number
-  sonTarama: string
+export interface TebligatErisimSatiri {
+  mukellefId: string
+  mukellefUnvan: string
+  vkn: string
+  sorumluPersonelId: string
+  durum: TebligatErisimSatirDurumu
+  erisim: TebligatErisim | null
 }
 
-export type TebligatPostaKutusuView = Omit<TebligatPostaKutusu, "sonUid">
+export interface TebligatErisimListParams {
+  /** Verilmezse tümü */
+  durum?: TebligatErisimSatirDurumu
+}
 
-export interface PostaKutusuKaydetRequest {
-  sunucu: string
-  port: number
-  kullanici: string
-  klasor: string
+export interface TebligatErisimKaydetRequest {
+  kullaniciKodu: string
   /** Yalnızca bu istekte backend'e gider; yanıtta ve depoda son 4 karakteri kalır */
   sifre: string
+}
+
+export interface TebligatMukellefTaraResponse {
+  yeni: number
+  erisim: TebligatErisim
 }
 
 // --- Gönderim kanalları --------------------------------------------------------------

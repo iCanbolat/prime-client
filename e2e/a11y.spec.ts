@@ -20,7 +20,7 @@ const SAYFALAR = [
   "/e-belge/e-defter",
   "/e-belge/baglantilar",
   "/tebligat",
-  "/tebligat?kapsam=eslesmeyen",
+  "/tebligat?erisim=",
   "/tahsilat/ozet",
   "/tahsilat/cari",
   "/tahsilat/kesinti",

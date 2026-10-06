@@ -19,9 +19,9 @@ describe("e-Tebligat", () => {
     expect(
       screen.getByText(/1 tebligatın süresi 3 gün içinde doluyor/)
     ).toBeInTheDocument()
-    // Kenar çubuğu: 2 açık tebligat
+    // Kenar çubuğu: 1 açık tebligat
     expect(
-      await screen.findByLabelText("2 açık e-Tebligat")
+      await screen.findByLabelText("1 açık e-Tebligat")
     ).toBeInTheDocument()
 
     await user.click(
@@ -42,36 +42,64 @@ describe("e-Tebligat", () => {
     expect(db.gorev.where((g) => g.sonTarih === "2026-09-25")).toHaveLength(1)
   })
 
-  it("eşleşmeyen tebligat mükellefe bağlanır", async () => {
-    const { user } = renderRoute(
-      "/tebligat?kapsam=eslesmeyen&tebligat=tb_eslesmeyen",
-      {
-        as: TEST_USERS.personel,
-      }
-    )
-    const panel = await screen.findByRole("dialog", { name: "Ödeme emri" })
+  it("sorunlu GİB erişimleri uyarılır; panelden şifre güncellenir", async () => {
+    const { router, user } = renderRoute("/tebligat", {
+      as: TEST_USERS.personel,
+    })
+    expect(
+      await screen.findByText(
+        "1 mükellefin GİB girişi başarısız, 1 mükellefin GİB erişimi tanımlı değil"
+      )
+    ).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Erişimleri düzenle" }))
+    expect(router.state.location.search).toBe("?erisim=")
+    const panel = await screen.findByRole("dialog", {
+      name: "GİB erişim durumu",
+    })
+    const hatali = await within(panel).findByRole("region", {
+      name: "Giriş başarısız",
+    })
+    expect(hatali).toHaveTextContent("Öztürk İnşaat")
     await user.click(
-      within(panel).getByRole("combobox", { name: "Mükellefle eşleştir" })
+      within(hatali).getByRole("button", { name: "Şifreyi güncelle" })
     )
-    await user.click(
-      await screen.findByRole("option", { name: /Öztürk İnşaat/ })
-    )
+    const form = await screen.findByRole("dialog", {
+      name: "GİB e-Tebligat erişimi",
+    })
+    await user.type(within(form).getByLabelText("Şifre"), "yeni-sifre")
+    await user.click(within(form).getByRole("button", { name: "Kaydet" }))
     await waitFor(() =>
-      expect(db.tebligat.find("tb_eslesmeyen")?.mukellefId).toBe("m_as")
+      expect(db.tebligatErisim.find("te_as")).toMatchObject({
+        durum: "AKTIF",
+        sifreIpucu: "ifre",
+      })
     )
   })
 
-  it("Şimdi tara yeni bildirimleri listeye ekler", async () => {
-    const { user } = renderRoute("/tebligat", { as: TEST_USERS.personel })
-    await screen.findByRole("table", { name: "e-Tebligatlar" })
-    const once = db.tebligat.count()
-    for (let i = 0; i < 4 && db.tebligat.count() === once; i++) {
-      await user.click(screen.getByRole("button", { name: "Şimdi tara" }))
-      await waitFor(() =>
-        expect(screen.getByRole("button", { name: "Şimdi tara" })).toBeEnabled()
-      )
-    }
-    expect(db.tebligat.count()).toBeGreaterThan(once)
+  it("mükellef kartında erişim tanımlanır", async () => {
+    const { user } = renderRoute("/mukellefler/m_sahis/tebligat", {
+      as: TEST_USERS.personel,
+    })
+    expect(await screen.findByText("Tanımlı değil")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Erişim tanımla" }))
+    const form = await screen.findByRole("dialog", {
+      name: "GİB e-Tebligat erişimi",
+    })
+    expect(within(form).getByLabelText(/İVD kullanıcı kodu/)).toHaveValue(
+      "10000000146"
+    )
+    await user.type(within(form).getByLabelText("Şifre"), "hatali")
+    await user.click(within(form).getByRole("button", { name: "Kaydet" }))
+    expect(
+      await within(form).findByText(/kullanıcı kodu veya şifre hatalı/)
+    ).toBeInTheDocument()
+    await user.clear(within(form).getByLabelText("Şifre"))
+    await user.type(within(form).getByLabelText("Şifre"), "dogru-sifre")
+    await user.click(within(form).getByRole("button", { name: "Kaydet" }))
+    expect(await screen.findByText("Taranıyor")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Şimdi tara" })
+    ).toBeInTheDocument()
   })
 
   it("mükellef kartında yalnızca o mükellefin tebligatları", async () => {

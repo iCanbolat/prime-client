@@ -93,7 +93,8 @@ function EkleForm({
       <DialogHeader>
         <DialogTitle>e-Tebligat ekle</DialogTitle>
         <DialogDescription>
-          Posta kutusuna düşmeyen (ör. İVD'de görülen) tebligatı elle kaydedin.
+          Gece taramasına girmeyen tebligatı (SGK, kâğıt tebligat ya da GİB
+          erişimi tanımlı olmayan mükellef) elle kaydedin.
         </DialogDescription>
       </DialogHeader>
       <FieldGroup>

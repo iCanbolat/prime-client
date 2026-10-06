@@ -157,8 +157,9 @@ export type AktiviteEylem =
   | "BURO_GUNCELLENDI"
   | "TEBLIGAT_ALINDI"
   | "TEBLIGAT_GUNCELLENDI"
-  | "POSTA_KUTUSU_BAGLANDI"
-  | "POSTA_KUTUSU_KALDIRILDI"
+  | "TEBLIGAT_ERISIMI_TANIMLANDI"
+  | "TEBLIGAT_ERISIMI_KALDIRILDI"
+  | "TEBLIGAT_ERISIM_HATASI"
   | "KANAL_GUNCELLENDI"
   | "KANAL_KALDIRILDI"
   | "MUKELLEFE_GONDERILDI"
@@ -719,13 +720,12 @@ export type TebligatTur =
 export type TebligatDurum = "YENI" | "INCELENDI" | "ISLEM_YAPILDI" | "KAPANDI"
 
 /**
- * e-Tebligat kaydı. GİB/SGK bildirim e-postası posta kutusundan okunup ayrıştırılarak ya da elle
+ * e-Tebligat kaydı. Gece taramasında mükellefin GİB e-Tebligat kutusundan okunarak ya da elle
  * oluşturulur. Tebliğ tarihi, son işlem günü ve kalan gün saklanmaz; ulaşma tarihinden türetilir.
  */
 export interface Tebligat {
   id: string
-  /** VKN/TCKN bir mükellefle eşleşmezse boş; "Eşleşmeyen" listesinde elle atanır */
-  mukellefId?: string
+  mukellefId: string
   vkn: string
   kurum: TebligatKurum
   tur: TebligatTur
@@ -740,32 +740,45 @@ export interface Tebligat {
   gorevId?: string
   arsivDosyaId?: string
   not?: string
-  kaynak: "EPOSTA" | "ELLE"
-  /** Posta kutusundaki mesajın kimliği — aynı e-posta iki kez kaydedilmez */
-  epostaMesajId?: string
+  kaynak: "GIB" | "ELLE"
+  /** GİB e-Tebligat kutusundaki belgenin kimliği — aynı belge iki kez kaydedilmez */
+  gibBelgeId?: string
   olusturmaTarihi: ISODateString
 }
 
-export type PostaKutusuDurumu = "BAGLI" | "HATA" | "BAGLI_DEGIL"
+export type TebligatErisimDurumu = "AKTIF" | "HATA"
 
 /**
- * Tebligat bildirimlerinin düştüğü IMAP kutusu (büro başına bir kayıt). Şifre yalnızca backend'de
- * saklanır; istemci ve mock DB son 4 karakteri (`sifreIpucu`) görür.
+ * Mükellefin GİB e-Tebligat erişimi (mükellef başına bir kayıt). Backend her gece bu bilgilerle
+ * mükellefin e-Tebligat kutusuna salt okunur giriş yapar. Şifre yalnızca backend'de (KMS ile
+ * şifreli) saklanır; istemci ve mock DB son 4 karakteri (`sifreIpucu`) görür. Şifre kasasından
+ * bağımsızdır: kasa sıfır bilgili olduğu için sunucu gece kasayı çözemez.
  */
-export interface TebligatPostaKutusu {
+export interface TebligatErisim {
   id: string
-  durum: PostaKutusuDurumu
-  sunucu: string
-  port: number
-  kullanici: string
-  klasor: string
-  sifreIpucu?: string
-  /** Son okunan mesajın IMAP UID'si (artımlı tarama) */
-  sonUid: number
-  sonTarama?: ISODateString
+  mukellefId: string
+  /** GİB İnteraktif Vergi Dairesi kullanıcı kodu (TCKN / VKN / kullanıcı kodu) */
+  kullaniciKodu: string
+  sifreIpucu: string
+  durum: TebligatErisimDurumu
   hataMesaji?: string
-  baglayanId?: string
-  baglanmaTarihi?: ISODateString
+  /** Son başarılı tarama */
+  sonTarama?: ISODateString
+  tanimlayanId: string
+  tanimlamaTarihi: ISODateString
+}
+
+/** Büro geneli gece taraması çalışması (gerçek backend'de zamanlanmış iş) */
+export interface TebligatTarama {
+  id: string
+  baslangic: ISODateString
+  bitis: ISODateString
+  /** Erişimi tanımlı, taranan mükellef sayısı */
+  taranan: number
+  /** Girişi başarısız olan mükellef sayısı */
+  hatali: number
+  /** Kaydedilen yeni tebligat sayısı */
+  yeni: number
 }
 
 // --- Gönderim kanalları ------------------------------------------------------------

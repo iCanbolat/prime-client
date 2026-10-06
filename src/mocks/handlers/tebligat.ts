@@ -1,17 +1,26 @@
 /**
- * `/api/tebligat/*` — e-Tebligat takibi. Posta kutusuna erişim `PostaAdapter` üzerinden (burada
- * mock uygulaması) yapılır; gerçek backend aynı uçları IMAP adaptörüyle karşılar.
+ * `/api/tebligat/*` — e-Tebligat takibi. Gerçek backend her gece erişimi tanımlı mükelleflerin
+ * GİB e-Tebligat kutusunu `GibTebligatAdapter` ile tarar; burada mock adaptör kullanılır ve
+ * kaçırılan son gece taraması (03:00) özet isteğinde işletilir (testte kapalı; testler
+ * `geceTaramasiCalistir`'ı doğrudan çağırır).
  */
-import { addDays } from "date-fns"
+import { addDays, addMinutes } from "date-fns"
 import { HttpResponse, http } from "msw"
 
-import { tebligatEpostasiAyristir } from "@/features/tebligat/eposta-ayristir"
-import { sureDurumu, SURE_KURALLARI } from "@/features/tebligat/kurallar"
-import type { PostaKimlik } from "@/features/tebligat/posta-adapter"
+import type {
+  GibKimlik,
+  GibTebligatAdapter,
+} from "@/features/tebligat/gib-adapter"
+import {
+  sureDurumu,
+  SURE_KURALLARI,
+  tebligatTuru,
+} from "@/features/tebligat/kurallar"
 import { TEBLIGAT_TUR_ETIKET } from "@/features/tebligat/sabitler"
 import { bugun, fromYmd, toYmd } from "@/lib/tarih"
 import { putBlob } from "@/mocks/blob-store"
 import { db } from "@/mocks/db"
+import { mockGibAdapter } from "@/mocks/gib/mock-adapter"
 import {
   api,
   errorResponse,
@@ -20,23 +29,27 @@ import {
   requireActor,
   turkishIncludes,
 } from "@/mocks/handlers/common"
-import { mockPostaAdapter as adapter } from "@/mocks/posta/mock-adapter"
+import { SISTEM_AKTOR } from "@/mocks/handlers/tahsilat"
 import type {
-  PostaKutusuKaydetRequest,
   TebligatBelgeRequest,
   TebligatEkleRequest,
+  TebligatErisimKaydetRequest,
+  TebligatErisimSatiri,
+  TebligatErisimSatirDurumu,
+  TebligatErisimSayilari,
   TebligatGuncelleRequest,
   TebligatKapsam,
   TebligatListResponse,
+  TebligatMukellefTaraResponse,
   TebligatOzetResponse,
-  TebligatPostaKutusuView,
-  TebligatTaraResponse,
   TebligatView,
 } from "@/types/api"
 import type {
+  Mukellef,
   Tebligat,
   TebligatDurum,
-  TebligatPostaKutusu,
+  TebligatErisim,
+  TebligatTarama,
   TebligatTur,
 } from "@/types/domain"
 
@@ -47,15 +60,23 @@ const DURUMLAR: TebligatDurum[] = [
   "KAPANDI",
 ]
 const TURLER = Object.keys(SURE_KURALLARI) as TebligatTur[]
-const KAPSAMLAR: TebligatKapsam[] = ["acik", "acil", "eslesmeyen", "kapali"]
+const KAPSAMLAR: TebligatKapsam[] = ["acik", "acil", "kapali"]
+const ERISIM_DURUMLARI: TebligatErisimSatirDurumu[] = [
+  "AKTIF",
+  "HATA",
+  "TANIMSIZ",
+]
 const DATA_URL_RE = /^data:([^;,]+)[;,]/
 const MAKS_DOSYA = 10 * 1024 * 1024
+/** Gece taramasının yerel saati */
+export const GECE_TARAMA_SAATI = 3
+const SAKLANAN_TARAMA = 30
 
 export function tebligatView(
   t: Tebligat,
   bugunYmd: string = bugun()
 ): TebligatView {
-  const m = t.mukellefId ? db.mukellef.find(t.mukellefId) : undefined
+  const m = db.mukellef.find(t.mukellefId)
   const a = t.atananId ? db.personel.find(t.atananId) : undefined
   return {
     ...t,
@@ -77,17 +98,9 @@ function sirala(a: TebligatView, b: TebligatView) {
   return b.ulasmaTarihi.localeCompare(a.ulasmaTarihi)
 }
 
-function postaKutusuView(
-  k: TebligatPostaKutusu | undefined
-): TebligatPostaKutusuView | null {
-  if (!k) return null
-  const { sonUid: _, ...view } = k
-  return view
-}
-
 /** Yeni tebligat bildirimi: atanan / mükellef sorumlusu ve yöneticiler */
 function tebligatAlicilari(t: Tebligat): string[] {
-  const m = t.mukellefId ? db.mukellef.find(t.mukellefId) : undefined
+  const m = db.mukellef.find(t.mukellefId)
   const yoneticiler = db.personel
     .where((p) => p.aktif && p.rol === "YONETICI")
     .map((p) => p.id)
@@ -95,170 +108,330 @@ function tebligatAlicilari(t: Tebligat): string[] {
 }
 
 function tebligatAciklama(t: Tebligat) {
-  const m = t.mukellefId ? db.mukellef.find(t.mukellefId) : undefined
+  const m = db.mukellef.find(t.mukellefId)
   return `${TEBLIGAT_TUR_ETIKET[t.tur]} · ${m?.unvan ?? `VKN ${t.vkn}`}`
 }
 
-function mukellefBul(vkn: string) {
-  return db.mukellef.where((m) => m.vkn === vkn || m.tckn === vkn)[0]
-}
-
-/** Mock backend'de şifre saklanmaz; adaptöre yalnızca istek anında verilir */
-const kimlik = (k: TebligatPostaKutusu, sifre = "mock"): PostaKimlik => ({
-  sunucu: k.sunucu,
-  port: k.port,
-  kullanici: k.kullanici,
-  klasor: k.klasor,
-  sifre,
+/**
+ * Mock backend'de şifre saklanmaz. Hatalı erişimde elle "Yeniden dene" personel şifreyi
+ * güncelleyene kadar başarısız kalsın diye adaptöre "hatali" verilir.
+ */
+const kimlik = (e: TebligatErisim): GibKimlik => ({
+  kullaniciKodu: e.kullaniciKodu,
+  sifre: e.durum === "HATA" ? "hatali" : "mock",
 })
 
+/** Önceki gece 03:00 (şu an 03:00'ten önceyse dünden önceki gece) */
+export function sonGeceTaramaAni(simdi: Date = new Date()): Date {
+  const an = new Date(simdi)
+  an.setHours(GECE_TARAMA_SAATI, 0, 0, 0)
+  if (an > simdi) an.setDate(an.getDate() - 1)
+  return an
+}
+
+function sonTarama(): TebligatTarama | null {
+  return (
+    db.tebligatTarama
+      .all()
+      .sort((a, b) => b.baslangic.localeCompare(a.baslangic))[0] ?? null
+  )
+}
+
+function erisimSayilari(): TebligatErisimSayilari {
+  const sayilar = { aktif: 0, hatali: 0, tanimsiz: 0 }
+  const erisimler = new Map(
+    db.tebligatErisim.all().map((e) => [e.mukellefId, e])
+  )
+  for (const m of db.mukellef.where((m) => m.aktif)) {
+    const e = erisimler.get(m.id)
+    if (!e) sayilar.tanimsiz++
+    else if (e.durum === "HATA") sayilar.hatali++
+    else sayilar.aktif++
+  }
+  return sayilar
+}
+
+/**
+ * Bir mükellefin kutusunu tarar; yeni belgeleri tebligat olarak kaydeder. Giriş başarısızsa
+ * erişim HATA'ya düşer (ilk düşüşte sorumluya bildirim) ve `null` döner.
+ */
+async function mukellefTara(
+  e: TebligatErisim,
+  m: Mukellef,
+  adapter: GibTebligatAdapter,
+  an: Date,
+  aktorId: string
+): Promise<number | null> {
+  const sonuc = await adapter.yeniBelgeler(kimlik(e), e.sonTarama)
+  if (!sonuc.gecerli) {
+    db.tebligatErisim.update(e.id, {
+      durum: "HATA",
+      hataMesaji: sonuc.hataMesaji,
+    })
+    if (e.durum !== "HATA")
+      logActivity(
+        {
+          aktorId,
+          eylem: "TEBLIGAT_ERISIM_HATASI",
+          hedefTip: "MUKELLEF",
+          hedefId: m.id,
+          mukellefId: m.id,
+          aciklama: `${m.unvan} · ${sonuc.hataMesaji}`,
+        },
+        {
+          alicilar: [m.sorumluPersonelId],
+          baslik: "GİB e-Tebligat girişi başarısız",
+        }
+      )
+    return null
+  }
+
+  const mevcut = new Set(
+    db.tebligat
+      .where((t) => t.mukellefId === m.id)
+      .flatMap((t) => (t.gibBelgeId ? [t.gibBelgeId] : []))
+  )
+  let yeni = 0
+  for (const b of sonuc.belgeler) {
+    if (mevcut.has(b.belgeId)) continue
+    mevcut.add(b.belgeId)
+    const t = db.tebligat.insert({
+      mukellefId: m.id,
+      vkn: (m.vkn ?? m.tckn)!,
+      kurum: b.kurum,
+      tur: tebligatTuru(`${b.belgeTuru} ${b.konu}`),
+      konu: b.konu,
+      belgeNo: b.belgeNo,
+      ulasmaTarihi: b.ulasmaTarihi,
+      durum: "YENI",
+      kaynak: "GIB",
+      gibBelgeId: b.belgeId,
+      olusturmaTarihi: an.toISOString(),
+    })
+    yeni++
+    logActivity(
+      {
+        aktorId,
+        eylem: "TEBLIGAT_ALINDI",
+        hedefTip: "TEBLIGAT",
+        hedefId: t.id,
+        mukellefId: m.id,
+        aciklama: tebligatAciklama(t),
+      },
+      { alicilar: tebligatAlicilari(t), baslik: "Yeni e-Tebligat" }
+    )
+  }
+  db.tebligatErisim.update(e.id, {
+    durum: "AKTIF",
+    hataMesaji: undefined,
+    sonTarama: an.toISOString(),
+  })
+  return yeni
+}
+
+/**
+ * Büro geneli gece taraması: erişimi tanımlı her aktif mükellef sırayla taranır. Girişi
+ * başarısız olanlar, GİB hesabı ardışık hatalı girişle kilitlenmesin diye şifre güncellenene
+ * kadar denenmez (hatalı sayılır).
+ */
+export async function geceTaramasiCalistir(
+  an: Date,
+  adapter: GibTebligatAdapter = mockGibAdapter(() => an)
+): Promise<TebligatTarama> {
+  let taranan = 0
+  let hatali = 0
+  let yeni = 0
+  for (const e of db.tebligatErisim.all()) {
+    const m = db.mukellef.find(e.mukellefId)
+    if (!m?.aktif) continue
+    taranan++
+    if (e.durum === "HATA") {
+      hatali++
+      continue
+    }
+    const n = await mukellefTara(e, m, adapter, an, SISTEM_AKTOR)
+    if (n === null) hatali++
+    else yeni += n
+  }
+  const tarama = db.tebligatTarama.insert({
+    baslangic: an.toISOString(),
+    bitis: addMinutes(an, Math.max(1, Math.ceil(taranan / 15))).toISOString(),
+    taranan,
+    hatali,
+    yeni,
+  })
+  const fazla = db.tebligatTarama
+    .all()
+    .sort((a, b) => b.baslangic.localeCompare(a.baslangic))
+    .slice(SAKLANAN_TARAMA)
+  for (const t of fazla) db.tebligatTarama.remove(t.id)
+  return tarama
+}
+
+let calisanTarama: Promise<unknown> | null = null
+
+/** Geliştirmede cron yerine: son gece taraması yapılmadıysa şimdi işletilir */
+function geceTaramasiGerekirse() {
+  if (import.meta.env.MODE === "test") return Promise.resolve()
+  if (calisanTarama) return calisanTarama
+  const an = sonGeceTaramaAni()
+  const son = sonTarama()
+  if (son && new Date(son.baslangic) >= an) return Promise.resolve()
+  calisanTarama = geceTaramasiCalistir(an).finally(() => {
+    calisanTarama = null
+  })
+  return calisanTarama
+}
+
+function erisimSatiri(
+  m: Mukellef,
+  e: TebligatErisim | undefined
+): TebligatErisimSatiri {
+  return {
+    mukellefId: m.id,
+    mukellefUnvan: m.unvan,
+    vkn: (m.vkn ?? m.tckn)!,
+    sorumluPersonelId: m.sorumluPersonelId,
+    durum: e?.durum ?? "TANIMSIZ",
+    erisim: e ?? null,
+  }
+}
+
+const erisimBul = (mukellefId: string) =>
+  db.tebligatErisim.where((e) => e.mukellefId === mukellefId)[0]
+
 export const tebligatHandlers = [
-  http.get(api("/tebligat/posta-kutusu"), () =>
-    HttpResponse.json(postaKutusuView(db.postaKutusu.all()[0]))
+  http.get(api("/tebligat/erisim"), ({ request }) => {
+    const durumParam = new URL(request.url).searchParams.get(
+      "durum"
+    ) as TebligatErisimSatirDurumu | null
+    const durum =
+      durumParam && ERISIM_DURUMLARI.includes(durumParam) ? durumParam : null
+    const erisimler = new Map(
+      db.tebligatErisim.all().map((e) => [e.mukellefId, e])
+    )
+    const satirlar = db.mukellef
+      .where((m) => m.aktif)
+      .map((m) => erisimSatiri(m, erisimler.get(m.id)))
+      .filter((s) => !durum || s.durum === durum)
+      .sort(
+        (a, b) =>
+          ERISIM_DURUMLARI.indexOf(b.durum) -
+            ERISIM_DURUMLARI.indexOf(a.durum) ||
+          a.mukellefUnvan.localeCompare(b.mukellefUnvan, "tr")
+      )
+    return HttpResponse.json(satirlar)
+  }),
+
+  http.get<{ mukellefId: string }>(
+    api("/tebligat/erisim/:mukellefId"),
+    ({ params }) => {
+      const m = db.mukellef.find(params.mukellefId)
+      if (!m) return notFound("Mükellef bulunamadı")
+      return HttpResponse.json(erisimSatiri(m, erisimBul(m.id)))
+    }
   ),
 
-  http.put<never, PostaKutusuKaydetRequest>(
-    api("/tebligat/posta-kutusu"),
-    async ({ request }) => {
+  http.put<{ mukellefId: string }, TebligatErisimKaydetRequest>(
+    api("/tebligat/erisim/:mukellefId"),
+    async ({ request, params }) => {
       const actor = requireActor(request)
       if (actor instanceof Response) return actor
-      if (actor.rol !== "YONETICI")
-        return errorResponse(
-          403,
-          "Posta kutusunu yalnızca yönetici bağlayabilir"
-        )
+      const m = db.mukellef.find(params.mukellefId)
+      if (!m) return notFound("Mükellef bulunamadı")
       const body = await request.json()
-      if (!body.sunucu?.trim() || !body.kullanici?.trim())
-        return errorResponse(400, "Sunucu ve kullanıcı adı zorunludur")
-      if (!Number.isInteger(body.port) || body.port < 1 || body.port > 65535)
-        return errorResponse(400, "Geçerli bir port girin")
+      const kullaniciKodu = body.kullaniciKodu?.trim() ?? ""
+      if (!/^\d{6,11}$/.test(kullaniciKodu))
+        return errorResponse(400, "Kullanıcı kodu 6–11 haneli olmalı")
       if (!body.sifre || body.sifre.length < 4)
         return errorResponse(400, "Şifre en az 4 karakter olmalı")
-      const temel = {
-        sunucu: body.sunucu.trim(),
-        port: body.port,
-        kullanici: body.kullanici.trim(),
-        klasor: body.klasor?.trim() || "INBOX",
-      }
-      const sonuc = await adapter.baglantiDogrula({
-        ...temel,
+      const sonuc = await mockGibAdapter().girisDogrula({
+        kullaniciKodu,
         sifre: body.sifre,
       })
       if (!sonuc.gecerli)
-        return errorResponse(422, sonuc.hataMesaji ?? "Bağlantı kurulamadı")
+        return errorResponse(422, sonuc.hataMesaji ?? "GİB girişi başarısız")
 
-      const [mevcut] = db.postaKutusu.all()
       const kayit = {
-        ...temel,
-        durum: "BAGLI" as const,
+        kullaniciKodu,
         sifreIpucu: body.sifre.slice(-4),
+        durum: "AKTIF" as const,
         hataMesaji: undefined,
-        baglayanId: actor.id,
-        baglanmaTarihi: new Date().toISOString(),
+        tanimlayanId: actor.id,
+        tanimlamaTarihi: new Date().toISOString(),
       }
-      const k = mevcut
-        ? db.postaKutusu.update(mevcut.id, kayit)!
-        : db.postaKutusu.insert({ ...kayit, sonUid: 0 })
+      const mevcut = erisimBul(m.id)
+      const e = mevcut
+        ? db.tebligatErisim.update(mevcut.id, kayit)!
+        : db.tebligatErisim.insert({ ...kayit, mukellefId: m.id })
       logActivity(
         {
           aktorId: actor.id,
-          eylem: "POSTA_KUTUSU_BAGLANDI",
-          aciklama: `${k.kullanici} (${k.sunucu})`,
+          eylem: "TEBLIGAT_ERISIMI_TANIMLANDI",
+          hedefTip: "MUKELLEF",
+          hedefId: m.id,
+          mukellefId: m.id,
+          aciklama: m.unvan,
         },
         false
       )
-      return HttpResponse.json(postaKutusuView(k))
+      return HttpResponse.json(erisimSatiri(m, e))
     }
   ),
 
-  http.delete(api("/tebligat/posta-kutusu"), ({ request }) => {
-    const actor = requireActor(request)
-    if (actor instanceof Response) return actor
-    if (actor.rol !== "YONETICI")
-      return errorResponse(403, "Posta kutusunu yalnızca yönetici kaldırabilir")
-    const [k] = db.postaKutusu.all()
-    if (!k) return notFound("Posta kutusu bağlı değil")
-    db.postaKutusu.remove(k.id)
-    logActivity(
-      {
-        aktorId: actor.id,
-        eylem: "POSTA_KUTUSU_KALDIRILDI",
-        aciklama: k.kullanici,
-      },
-      false
-    )
-    return new HttpResponse(null, { status: 204 })
-  }),
-
-  http.post(api("/tebligat/tara"), async ({ request }) => {
-    const actor = requireActor(request)
-    if (actor instanceof Response) return actor
-    const [k] = db.postaKutusu.all()
-    if (!k || k.durum === "BAGLI_DEGIL")
-      return errorResponse(
-        409,
-        "Önce Ayarlar → Kanallar'dan posta kutusunu bağlayın"
-      )
-    if (k.durum === "HATA")
-      return errorResponse(
-        409,
-        k.hataMesaji ?? "Posta kutusu bağlantısı hatalı"
-      )
-
-    const { mesajlar, sonUid } = await adapter.yeniMesajlar(kimlik(k), k.sonUid)
-    const mevcut = new Set(
-      db.tebligat
-        .all()
-        .flatMap((t) => (t.epostaMesajId ? [t.epostaMesajId] : []))
-    )
-    let yeni = 0
-    let eslesmeyen = 0
-    let atlanan = 0
-    for (const e of mesajlar) {
-      const a = tebligatEpostasiAyristir(e)
-      if (!a || mevcut.has(e.mesajId)) {
-        atlanan++
-        continue
-      }
-      const m = mukellefBul(a.vkn)
-      const t = db.tebligat.insert({
-        ...a,
-        mukellefId: m?.id,
-        durum: "YENI",
-        kaynak: "EPOSTA",
-        epostaMesajId: e.mesajId,
-        olusturmaTarihi: new Date().toISOString(),
-      })
-      yeni++
-      if (!m) eslesmeyen++
+  http.delete<{ mukellefId: string }>(
+    api("/tebligat/erisim/:mukellefId"),
+    ({ request, params }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      const m = db.mukellef.find(params.mukellefId)
+      const e = m && erisimBul(m.id)
+      if (!m || !e) return notFound("GİB erişimi tanımlı değil")
+      db.tebligatErisim.remove(e.id)
       logActivity(
         {
           aktorId: actor.id,
-          eylem: "TEBLIGAT_ALINDI",
-          hedefTip: "TEBLIGAT",
-          hedefId: t.id,
-          mukellefId: t.mukellefId,
-          aciklama: tebligatAciklama(t),
+          eylem: "TEBLIGAT_ERISIMI_KALDIRILDI",
+          hedefTip: "MUKELLEF",
+          hedefId: m.id,
+          mukellefId: m.id,
+          aciklama: m.unvan,
         },
-        {
-          alicilar: tebligatAlicilari(t),
-          baslik: m ? "Yeni e-Tebligat" : "Eşleşmeyen e-Tebligat",
-        }
+        false
       )
+      return new HttpResponse(null, { status: 204 })
     }
-    const sonTarama = new Date().toISOString()
-    db.postaKutusu.update(k.id, { sonUid, sonTarama })
-    const yanit: TebligatTaraResponse = {
-      okunan: mesajlar.length,
-      yeni,
-      eslesmeyen,
-      atlanan,
-      sonTarama,
-    }
-    return HttpResponse.json(yanit)
-  }),
+  ),
 
-  http.get(api("/tebligat/ozet"), ({ request }) => {
+  /** Gece beklemeden tek mükellefi tarar (erişim yeni tanımlandığında / hata düzeldiğinde) */
+  http.post<{ mukellefId: string }>(
+    api("/tebligat/erisim/:mukellefId/tara"),
+    async ({ request, params }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      const m = db.mukellef.find(params.mukellefId)
+      const e = m && erisimBul(m.id)
+      if (!m || !e) return notFound("GİB erişimi tanımlı değil")
+      const yeni = await mukellefTara(
+        e,
+        m,
+        mockGibAdapter(),
+        new Date(),
+        actor.id
+      )
+      const guncel = erisimBul(m.id)!
+      if (yeni === null)
+        return errorResponse(
+          409,
+          guncel.hataMesaji ?? "GİB e-Tebligat kutusuna girilemedi"
+        )
+      const yanit: TebligatMukellefTaraResponse = { yeni, erisim: guncel }
+      return HttpResponse.json(yanit)
+    }
+  ),
+
+  http.get(api("/tebligat/ozet"), async ({ request }) => {
+    await geceTaramasiGerekirse()
     const sorumlu = new URL(request.url).searchParams.get("sorumlu")
     const bugunYmd = bugun()
     const views = db.tebligat
@@ -276,13 +449,13 @@ export const tebligatHandlers = [
       acik: acik.length,
       acil: acik.filter((t) => t.acil).length,
       geciken: acik.filter((t) => t.gecikti).length,
-      eslesmeyen: acik.filter((t) => !t.mukellefId).length,
       yeni: views.filter((t) => t.ulasmaTarihi.slice(0, 10) >= hafta).length,
       yaklasan: acik
         .filter((t) => t.sonIslemTarihi)
         .sort(sirala)
         .slice(0, 5),
-      postaKutusu: postaKutusuView(db.postaKutusu.all()[0]),
+      sonTarama: sonTarama(),
+      erisim: erisimSayilari(),
     }
     return HttpResponse.json(yanit)
   }),
@@ -305,7 +478,6 @@ export const tebligatHandlers = [
           (!tur || !TURLER.includes(tur) || t.tur === tur) &&
           (kapsam !== "acik" || t.acik) &&
           (kapsam !== "acil" || t.acil || t.gecikti) &&
-          (kapsam !== "eslesmeyen" || !t.mukellefId) &&
           (kapsam !== "kapali" || !t.acik) &&
           (!q ||
             turkishIncludes(t.mukellefUnvan, q) ||
@@ -420,12 +592,6 @@ export const tebligatHandlers = [
           return errorResponse(400, "Süre 1–365 gün olmalı")
         patch.sureGun = body.sureGun ?? undefined
       }
-      if (body.mukellefId !== undefined) {
-        const m = db.mukellef.find(body.mukellefId)
-        if (!m) return errorResponse(400, "Mükellef bulunamadı")
-        patch.mukellefId = m.id
-        degisiklik.push("mükellef")
-      }
 
       const guncel = db.tebligat.update(t.id, patch)!
       if (degisiklik.length)
@@ -456,8 +622,6 @@ export const tebligatHandlers = [
       if (actor instanceof Response) return actor
       const t = db.tebligat.find(params.id)
       if (!t) return notFound("Tebligat bulunamadı")
-      if (!t.mukellefId)
-        return errorResponse(409, "Önce tebligatı bir mükellefle eşleştirin")
       if (t.gorevId && db.gorev.find(t.gorevId))
         return errorResponse(409, "Bu tebligat için görev zaten var")
       const m = db.mukellef.find(t.mukellefId)!
@@ -510,8 +674,6 @@ export const tebligatHandlers = [
       if (actor instanceof Response) return actor
       const t = db.tebligat.find(params.id)
       if (!t) return notFound("Tebligat bulunamadı")
-      if (!t.mukellefId)
-        return errorResponse(409, "Önce tebligatı bir mükellefle eşleştirin")
       const { dosya } = await request.json()
       const mimeType = DATA_URL_RE.exec(dosya?.dataUrl ?? "")?.[1]
       if (

@@ -63,9 +63,9 @@ function tebligatSatirlari(o: TebligatOzetResponse): Satir[] {
       ton: "tehlike",
     },
     {
-      etiket: "Eşleşmeyen tebligat",
-      deger: o.eslesmeyen,
-      to: "/tebligat?kapsam=eslesmeyen",
+      etiket: "GİB girişi başarısız mükellef",
+      deger: o.erisim.hatali,
+      to: "/tebligat?erisim=",
       icon: LegalDocument01Icon,
       ton: "uyari",
     },

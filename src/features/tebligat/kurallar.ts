@@ -10,6 +10,7 @@
  */
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns"
 
+import { normalize } from "@/features/ice-aktarim/tahakkuk"
 import { isGununeKaydir } from "@/features/takvim/motor"
 import { fromYmd, toYmd } from "@/lib/tarih"
 import type { Tebligat, TebligatDurum, TebligatTur } from "@/types/domain"
@@ -114,4 +115,25 @@ export function sureDurumu(
     acil:
       acik && kalanGun !== undefined && kalanGun >= 0 && kalanGun <= ACIL_GUN,
   }
+}
+
+/** Sıra önemli: daha özgül ifade önce */
+const TUR_KALIPLARI: [TebligatTur, RegExp][] = [
+  ["ODEME_EMRI", /ODEME EMRI/],
+  [
+    "VERGI_CEZA_IHBARNAMESI",
+    /(VERGI\/CEZA|VERGI ZIYAI|CEZA) IHBARNAME|IHBARNAME/,
+  ],
+  ["IZAHA_DAVET", /IZAHA DAVET/],
+  ["BILGI_ISTEME", /BILGI (ISTEME|TALEP)|BILGI VE BELGE (ISTEME|TALEP)/],
+  ["INCELEME", /INCELEME|DEFTER VE BELGE(LERIN)? IBRAZ/],
+]
+
+/**
+ * GİB e-Tebligat kutusundaki belge türü / konu metnini sınıflar; tanınmayan → `DIGER`.
+ * Not: kalıplar örnek metinlerle yazıldı; gerçek GİB belge türleriyle kalibre edilmelidir.
+ */
+export function tebligatTuru(metin: string): TebligatTur {
+  const n = normalize(metin)
+  return TUR_KALIPLARI.find(([, re]) => re.test(n))?.[0] ?? "DIGER"
 }

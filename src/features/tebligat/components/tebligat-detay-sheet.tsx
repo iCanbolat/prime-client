@@ -23,7 +23,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import { MukellefSelect } from "@/features/mukellef/components/mukellef-select"
 import { PersonelSelect } from "@/features/mukellef/components/personel-select"
 import {
   SureBadge,
@@ -101,21 +100,19 @@ function Icerik({ t }: { t: TebligatView }) {
           <TebligatDurumBadge durum={t.durum} />
           <SureBadge t={t} />
           <Badge variant="outline">{KURUM_ETIKET[t.kurum]}</Badge>
-          {t.kaynak === "ELLE" && <Badge variant="outline">Elle girildi</Badge>}
+          <Badge variant="outline">
+            {t.kaynak === "ELLE" ? "Elle girildi" : "Gece taramasından"}
+          </Badge>
         </div>
         <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm">
           <dt className="text-muted-foreground">Mükellef</dt>
           <dd className="font-medium">
-            {t.mukellefId ? (
-              <Link
-                to={`/mukellefler/${t.mukellefId}/tebligat`}
-                className="hover:underline"
-              >
-                {t.mukellefUnvan}
-              </Link>
-            ) : (
-              <span className="text-destructive">Eşleşmedi</span>
-            )}
+            <Link
+              to={`/mukellefler/${t.mukellefId}/tebligat`}
+              className="hover:underline"
+            >
+              {t.mukellefUnvan}
+            </Link>
           </dd>
           <dt className="text-muted-foreground">VKN / TCKN</dt>
           <dd className="font-mono tabular-nums">{t.vkn}</dd>
@@ -140,29 +137,6 @@ function Icerik({ t }: { t: TebligatView }) {
           )}
         </dl>
       </section>
-
-      {!t.mukellefId && (
-        <Field>
-          <FieldLabel htmlFor="tebligat-mukellef">
-            Mükellefle eşleştir
-          </FieldLabel>
-          <MukellefSelect
-            id="tebligat-mukellef"
-            value=""
-            onValueChange={(id) =>
-              id &&
-              kaydet(
-                { id: t.id, mukellefId: id },
-                "Tebligat mükellefe bağlandı"
-              )
-            }
-          />
-          <FieldDescription>
-            VKN {t.vkn} kayıtlı mükelleflerle eşleşmedi. Mükellefin VKN/TCKN'si
-            değiştiyse kartını da güncelleyin.
-          </FieldDescription>
-        </Field>
-      )}
 
       <Cizelge t={t} />
 
@@ -281,7 +255,7 @@ function Icerik({ t }: { t: TebligatView }) {
         ) : (
           <Button
             className="justify-self-start"
-            disabled={!t.mukellefId || gorev.isPending}
+            disabled={gorev.isPending}
             onClick={() =>
               gorev.mutate(t.id, {
                 onSuccess: (g) =>
@@ -305,12 +279,12 @@ function Icerik({ t }: { t: TebligatView }) {
           >
             Tebligat belgesi arşivde
           </Link>
-        ) : t.mukellefId ? (
+        ) : (
           <FileDropzone
             accept="application/pdf,image/png,image/jpeg"
             multiple={false}
             disabled={belge.isPending}
-            hint="İVD'den indirilen tebligat PDF'i · arşive e-Tebligat kategorisinde kaydedilir"
+            hint="GİB e-Tebligat'tan indirilen belge PDF'i · arşive e-Tebligat kategorisinde kaydedilir"
             onFiles={async ([dosya]) => {
               if (!dosya) return
               try {
@@ -326,7 +300,7 @@ function Icerik({ t }: { t: TebligatView }) {
               }
             }}
           />
-        ) : null}
+        )}
       </section>
     </div>
   )

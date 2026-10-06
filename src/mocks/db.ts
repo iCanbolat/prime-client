@@ -29,7 +29,8 @@ import type {
   KesintiIceAktarim,
   KesintiKaydi,
   Tebligat,
-  TebligatPostaKutusu,
+  TebligatErisim,
+  TebligatTarama,
   BildirimTercihi,
   Gonderim,
   KanalAyari,
@@ -78,10 +79,12 @@ export interface DbState {
   /** İVD kesinti listesi içe aktarımları (yıl başına bir kayıt) */
   kesintiAktarim: KesintiIceAktarim[]
   kesinti: KesintiKaydi[]
-  /** e-Tebligat kayıtları (posta kutusu taramasından veya elle) */
+  /** e-Tebligat kayıtları (gece GİB taramasından veya elle) */
   tebligat: Tebligat[]
-  /** Tebligat bildirimlerinin okunduğu IMAP kutusu (şifre burada da tutulmaz) */
-  postaKutusu: TebligatPostaKutusu[]
+  /** Mükellef başına GİB e-Tebligat erişimi (şifre burada da tutulmaz) */
+  tebligatErisim: TebligatErisim[]
+  /** Gece taraması çalışmaları (en yeni 30) */
+  tebligatTarama: TebligatTarama[]
   /** Büronun dış gönderim kanalları (gizli alanlar burada da tutulmaz) */
   kanal: KanalAyari[]
   /** Personel bildirim kanal tercihleri (id = personelId) */
@@ -98,7 +101,7 @@ export interface DbState {
   lucaAktarim: LucaAktarim[]
 }
 
-export const STORAGE_KEY = "prime-ofis:db:v12"
+export const STORAGE_KEY = "prime-ofis:db:v13"
 
 const ID_PREFIX: Record<keyof DbState, string> = {
   buro: "b",
@@ -124,7 +127,8 @@ const ID_PREFIX: Record<keyof DbState, string> = {
   kesintiAktarim: "ki",
   kesinti: "ks",
   tebligat: "tb",
-  postaKutusu: "pk",
+  tebligatErisim: "te",
+  tebligatTarama: "tt",
   kanal: "kn",
   bildirimTercihi: "bt",
   gonderim: "gn",
@@ -265,7 +269,8 @@ export const db = {
   kesintiAktarim: collection("kesintiAktarim"),
   kesinti: collection("kesinti"),
   tebligat: collection("tebligat"),
-  postaKutusu: collection("postaKutusu"),
+  tebligatErisim: collection("tebligatErisim"),
+  tebligatTarama: collection("tebligatTarama"),
   kanal: collection("kanal"),
   bildirimTercihi: collection("bildirimTercihi"),
   gonderim: collection("gonderim"),

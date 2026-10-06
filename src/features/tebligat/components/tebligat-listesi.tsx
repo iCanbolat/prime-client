@@ -74,15 +74,6 @@ export function TebligatListesi({ mukellefId }: { mukellefId?: string }) {
     [setSearchParams]
   )
 
-  const kapsamlar = mukellefId
-    ? (Object.fromEntries(
-        KAPSAMLAR.filter((k) => k !== "eslesmeyen").map((k) => [
-          k,
-          KAPSAM_ETIKET[k],
-        ])
-      ) as Record<TebligatKapsam, string>)
-    : KAPSAM_ETIKET
-
   return (
     <>
       <ListeAraclari
@@ -100,7 +91,7 @@ export function TebligatListesi({ mukellefId }: { mukellefId?: string }) {
       >
         <SekmeFiltre
           etiket="Kapsam"
-          secenekler={kapsamlar}
+          secenekler={KAPSAM_ETIKET}
           value={kapsam}
           onChange={(v) => guncelle({ kapsam: v })}
         />
@@ -114,7 +105,7 @@ export function TebligatListesi({ mukellefId }: { mukellefId?: string }) {
         <EmptyState
           icon={LegalDocument01Icon}
           title={kapsam ? "Bu filtrede tebligat yok" : "Henüz e-Tebligat yok"}
-          description="Posta kutusuna düşen GİB/SGK bildirimleri burada listelenir."
+          description="Gece taramasında GİB e-Tebligat kutularından alınan ve elle girilen tebligatlar burada listelenir."
         />
       ) : (
         <>
@@ -151,17 +142,13 @@ export function TebligatListesi({ mukellefId }: { mukellefId?: string }) {
                       </span>
                       {!mukellefId && (
                         <span className="block truncate text-xs md:hidden">
-                          {t.mukellefUnvan ?? `VKN ${t.vkn}`}
+                          {t.mukellefUnvan}
                         </span>
                       )}
                     </TableCell>
                     {!mukellefId && (
                       <TableCell className="hidden max-w-64 whitespace-normal md:table-cell">
-                        {t.mukellefUnvan ?? (
-                          <span className="text-destructive">
-                            Eşleşmedi · {t.vkn}
-                          </span>
-                        )}
+                        {t.mukellefUnvan}
                       </TableCell>
                     )}
                     <TableCell className="hidden text-muted-foreground tabular-nums sm:table-cell">

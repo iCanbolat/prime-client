@@ -10,8 +10,9 @@ import { arsivKeys } from "@/features/arsiv/queries"
 import { gorevKeys } from "@/features/gorev/queries"
 import { tebligatApi } from "@/features/tebligat/api"
 import type {
-  PostaKutusuKaydetRequest,
   TebligatEkleRequest,
+  TebligatErisimKaydetRequest,
+  TebligatErisimListParams,
   TebligatGuncelleRequest,
   TebligatListParams,
 } from "@/types/api"
@@ -23,7 +24,10 @@ export const tebligatKeys = {
   ozet: (params: { sorumlu?: string }) =>
     [...tebligatKeys.all, "ozet", params] as const,
   detay: (id: string) => [...tebligatKeys.all, "detay", id] as const,
-  postaKutusu: ["tebligat", "posta-kutusu"] as const,
+  erisimler: (params: TebligatErisimListParams) =>
+    [...tebligatKeys.all, "erisim", "liste", params] as const,
+  erisim: (mukellefId: string) =>
+    [...tebligatKeys.all, "erisim", mukellefId] as const,
 }
 
 export function useTebligatlar(params: TebligatListParams) {
@@ -34,7 +38,7 @@ export function useTebligatlar(params: TebligatListParams) {
   })
 }
 
-/** Kenar çubuğu rozeti ve dashboard; yeni tebligatlar taramayla geldiği için periyodik yenilenir */
+/** Kenar çubuğu rozeti ve dashboard; tebligatlar gece taramasıyla geldiği için periyodik yenilenir */
 export function useTebligatOzet(params: { sorumlu?: string } = {}) {
   return useQuery({
     queryKey: tebligatKeys.ozet(params),
@@ -51,10 +55,21 @@ export function useTebligat(id: string | undefined) {
   })
 }
 
-export function usePostaKutusu() {
+export function useTebligatErisimleri(
+  params: TebligatErisimListParams = {},
+  enabled = true
+) {
   return useQuery({
-    queryKey: tebligatKeys.postaKutusu,
-    queryFn: tebligatApi.postaKutusu,
+    queryKey: tebligatKeys.erisimler(params),
+    queryFn: () => tebligatApi.erisimler(params),
+    enabled,
+  })
+}
+
+export function useTebligatErisim(mukellefId: string) {
+  return useQuery({
+    queryKey: tebligatKeys.erisim(mukellefId),
+    queryFn: () => tebligatApi.erisim(mukellefId),
   })
 }
 
@@ -67,11 +82,6 @@ function useInvalidate(ekler: { gorev?: boolean; arsiv?: boolean } = {}) {
       ekler.gorev && queryClient.invalidateQueries({ queryKey: gorevKeys.all }),
       ekler.arsiv && queryClient.invalidateQueries({ queryKey: arsivKeys.all }),
     ])
-}
-
-export function useTebligatTara() {
-  const invalidate = useInvalidate()
-  return useMutation({ mutationFn: tebligatApi.tara, onSuccess: invalidate })
 }
 
 export function useTebligatEkle() {
@@ -113,19 +123,31 @@ export function useTebligatBelge() {
   })
 }
 
-export function usePostaKutusuKaydet() {
+export function useTebligatErisimKaydet() {
   const invalidate = useInvalidate()
   return useMutation({
-    mutationFn: (body: PostaKutusuKaydetRequest) =>
-      tebligatApi.postaKutusuKaydet(body),
+    mutationFn: ({
+      mukellefId,
+      ...body
+    }: TebligatErisimKaydetRequest & { mukellefId: string }) =>
+      tebligatApi.erisimKaydet(mukellefId, body),
     onSuccess: invalidate,
   })
 }
 
-export function usePostaKutusuKaldir() {
+export function useTebligatErisimKaldir() {
   const invalidate = useInvalidate()
   return useMutation({
-    mutationFn: tebligatApi.postaKutusuKaldir,
+    mutationFn: tebligatApi.erisimKaldir,
     onSuccess: invalidate,
+  })
+}
+
+/** Tek mükellefi gece beklemeden tarar; hata da erişim durumunu değiştirdiği için her durumda yenilenir */
+export function useTebligatMukellefTara() {
+  const invalidate = useInvalidate()
+  return useMutation({
+    mutationFn: tebligatApi.mukellefTara,
+    onSettled: invalidate,
   })
 }

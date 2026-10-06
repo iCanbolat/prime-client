@@ -1,7 +1,10 @@
 import { Badge } from "@/components/ui/badge"
-import { TEBLIGAT_DURUM_ETIKET } from "@/features/tebligat/sabitler"
+import {
+  ERISIM_DURUM_ETIKET,
+  TEBLIGAT_DURUM_ETIKET,
+} from "@/features/tebligat/sabitler"
 import { cn } from "@/lib/utils"
-import type { TebligatView } from "@/types/api"
+import type { TebligatErisimSatirDurumu, TebligatView } from "@/types/api"
 import type { TebligatDurum } from "@/types/domain"
 
 const MAVI = "bg-sky-500/15 text-sky-800 dark:text-sky-300"
@@ -52,6 +55,26 @@ export function SureBadge({
       className={cn(t.acil ? KIRMIZI : GRI, className)}
     >
       {t.kalanGun === 0 ? "Son gün bugün" : `${t.kalanGun} gün kaldı`}
+    </Badge>
+  )
+}
+
+const ERISIM_RENK: Record<TebligatErisimSatirDurumu, string> = {
+  AKTIF: YESIL,
+  HATA: KIRMIZI,
+  TANIMSIZ: GRI,
+}
+
+export function ErisimDurumBadge({
+  durum,
+  className,
+}: {
+  durum: TebligatErisimSatirDurumu
+  className?: string
+}) {
+  return (
+    <Badge variant="secondary" className={cn(ERISIM_RENK[durum], className)}>
+      {ERISIM_DURUM_ETIKET[durum]}
     </Badge>
   )
 }

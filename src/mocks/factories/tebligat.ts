@@ -1,12 +1,14 @@
-import type { Faker } from "@faker-js/faker"
+import { Faker, base, en, tr } from "@faker-js/faker"
 import { addDays } from "date-fns"
 
 import { fromYmd, toYmd } from "@/lib/tarih"
+import { karma } from "@/mocks/karma"
 import type {
   Mukellef,
   Tebligat,
   TebligatDurum,
-  TebligatPostaKutusu,
+  TebligatErisim,
+  TebligatTarama,
   TebligatTur,
 } from "@/types/domain"
 
@@ -27,7 +29,6 @@ const SABITLER: {
   tur: TebligatTur
   ulasma: string
   durum: TebligatDurum
-  eslesmeyen?: boolean
   sgk?: boolean
 }[] = [
   // Son günü yaklaşan (acil)
@@ -38,14 +39,53 @@ const SABITLER: {
   // Yeni düşenler
   { tur: "VERGI_CEZA_IHBARNAMESI", ulasma: "2026-09-21", durum: "YENI" },
   { tur: "BILGI_ISTEME", ulasma: "2026-09-18", durum: "YENI", sgk: true },
-  // Eşleşmeyen VKN
-  { tur: "ODEME_EMRI", ulasma: "2026-09-19", durum: "YENI", eslesmeyen: true },
-  { tur: "DIGER", ulasma: "2026-09-12", durum: "YENI", eslesmeyen: true },
+  { tur: "ODEME_EMRI", ulasma: "2026-09-19", durum: "YENI" },
+  { tur: "DIGER", ulasma: "2026-09-12", durum: "YENI" },
 ]
 
 export interface TebligatSeed {
   tebligat: Tebligat[]
-  postaKutusu: TebligatPostaKutusu[]
+  tebligatErisim: TebligatErisim[]
+  tebligatTarama: TebligatTarama[]
+}
+
+/** Seed'deki son gece taraması (yerel 03:00); uygulama açılınca kaçırılan geceler taranır */
+const SON_TARAMA = new Date(2026, 8, 22, 3, 0).toISOString()
+
+/**
+ * Aktif mükelleflerin çoğunda erişim tanımlı; birkaçında giriş hatalı, kalanında tanımsız.
+ * Ayrı tohumlu faker: ortak faker sırası (sonraki kanal verisi) bozulmasın.
+ */
+function createErisimler(
+  mukellefler: Mukellef[],
+  personelIds: string[]
+): TebligatErisim[] {
+  const faker = new Faker({ locale: [tr, en, base] })
+  faker.seed(karma("tebligat-erisim"))
+  return mukellefler
+    .filter((m) => m.aktif)
+    .flatMap((m, i): TebligatErisim[] => {
+      const r = faker.number.float()
+      if (r > 0.85) return []
+      const hatali = i % 11 === 3
+      return [
+        {
+          id: `te_${String(i + 1).padStart(3, "0")}`,
+          mukellefId: m.id,
+          kullaniciKodu: (m.tckn ?? m.vkn)!,
+          sifreIpucu: faker.string.alphanumeric(4),
+          durum: hatali ? "HATA" : "AKTIF",
+          hataMesaji: hatali
+            ? "GİB şifresinin süresi dolmuş; İVD'den yenileyip buraya girin"
+            : undefined,
+          sonTarama: hatali
+            ? new Date(2026, 8, 15, 3, 0).toISOString()
+            : SON_TARAMA,
+          tanimlayanId: faker.helpers.arrayElement(personelIds),
+          tanimlamaTarihi: "2026-06-01T09:00:00.000Z",
+        },
+      ]
+    })
 }
 
 /** Son 90 günde ~25 tebligat; eskiler çoğunlukla işlem görmüş, yenileri açık */
@@ -61,7 +101,7 @@ export function createTebligatVerisi(
     tur: TebligatTur,
     ulasmaYmd: string,
     durum: TebligatDurum,
-    { eslesmeyen = false, sgk = false } = {}
+    { sgk = false } = {}
   ) => {
     sira++
     const m = faker.helpers.arrayElement(aktifler)
@@ -69,18 +109,15 @@ export function createTebligatVerisi(
     ulasma.setHours(faker.number.int({ min: 8, max: 18 }), 15)
     tebligat.push({
       id: `tb_${String(sira).padStart(3, "0")}`,
-      mukellefId: eslesmeyen ? undefined : m.id,
-      vkn: eslesmeyen
-        ? faker.helpers.arrayElement(["4840847211", "7250331843"])
-        : (m.vkn ?? m.tckn)!,
-      kurum: sgk && !eslesmeyen ? "SGK" : "GIB",
+      mukellefId: m.id,
+      vkn: (m.vkn ?? m.tckn)!,
+      kurum: sgk ? "SGK" : "GIB",
       tur,
       konu: faker.helpers.arrayElement(KONU[tur]),
       belgeNo: `${ulasmaYmd.slice(0, 4)}-${faker.string.numeric(8)}`,
       ulasmaTarihi: ulasma.toISOString(),
       durum,
-      atananId:
-        durum === "YENI" || eslesmeyen ? undefined : m.sorumluPersonelId,
+      atananId: durum === "YENI" ? undefined : m.sorumluPersonelId,
       not:
         durum === "ISLEM_YAPILDI"
           ? faker.helpers.arrayElement([
@@ -89,14 +126,14 @@ export function createTebligatVerisi(
               "Uzlaşma talebinde bulunuldu.",
             ])
           : undefined,
-      kaynak: "EPOSTA",
-      epostaMesajId: `<seed-${sira}@posta>`,
+      // SGK tebligatları GİB kutusunda değildir; elle girilir
+      kaynak: sgk ? "ELLE" : "GIB",
+      gibBelgeId: sgk ? undefined : `gib-seed-${sira}`,
       olusturmaTarihi: ulasma.toISOString(),
     })
   }
 
-  for (const s of SABITLER)
-    ekle(s.tur, s.ulasma, s.durum, { eslesmeyen: s.eslesmeyen, sgk: s.sgk })
+  for (const s of SABITLER) ekle(s.tur, s.ulasma, s.durum, { sgk: s.sgk })
 
   const turler: TebligatTur[] = [
     "ODEME_EMRI",
@@ -122,21 +159,18 @@ export function createTebligatVerisi(
   }
 
   tebligat.sort((a, b) => b.ulasmaTarihi.localeCompare(a.ulasmaTarihi))
+  const tebligatErisim = createErisimler(mukellefler, personelIds)
   return {
     tebligat,
-    postaKutusu: [
+    tebligatErisim,
+    tebligatTarama: [
       {
-        id: "pk_1",
-        durum: "BAGLI",
-        sunucu: "imap.yandex.com.tr",
-        port: 993,
-        kullanici: "tebligat@primemusavirlik.com.tr",
-        klasor: "INBOX",
-        sifreIpucu: "x7Qa",
-        sonUid: 1000,
-        sonTarama: "2026-09-22T07:30:00.000Z",
-        baglayanId: personelIds[0],
-        baglanmaTarihi: "2026-01-10T09:00:00.000Z",
+        id: "tt_001",
+        baslangic: SON_TARAMA,
+        bitis: new Date(2026, 8, 22, 3, 6).toISOString(),
+        taranan: tebligatErisim.length,
+        hatali: tebligatErisim.filter((e) => e.durum === "HATA").length,
+        yeni: 0,
       },
     ],
   }

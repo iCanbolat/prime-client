@@ -111,8 +111,7 @@ export function turKategorisi(tur: BildirimTur): BildirimKategori {
     return "ebelge"
   if (tur.startsWith("ARSIV_")) return "arsiv"
   if (tur.startsWith("MUKELLEF_")) return "mukellef"
-  if (tur.startsWith("TEBLIGAT_") || tur.startsWith("POSTA_KUTUSU_"))
-    return "tebligat"
+  if (tur.startsWith("TEBLIGAT_")) return "tebligat"
   if (
     tur.startsWith("TAHSILAT_") ||
     tur.startsWith("ODEME_") ||

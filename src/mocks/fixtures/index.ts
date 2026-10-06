@@ -18,7 +18,8 @@ import type {
   KontorAlim,
   CariHareket,
   Tebligat,
-  TebligatPostaKutusu,
+  TebligatErisim,
+  TebligatTarama,
   KanalAyari,
   EvrakTalebi,
   GelenEvrak,
@@ -689,7 +690,7 @@ export const FIXTURE_CARI: CariHareket[] = [
 
 /**
  * Bugün 2026-09-23 kabulüyle: ödeme emri 2026-09-05'te ulaştı → tebliğ 09-10, son gün 09-25 (acil);
- * izaha davet işlem gördü; eşleşmeyen VKN'li bir ödeme emri.
+ * izaha davet işlem gördü. GİB erişimi: m_ltd aktif, m_as hatalı, m_sahis tanımsız.
  */
 export const FIXTURE_TEBLIGAT: Tebligat[] = [
   {
@@ -702,8 +703,8 @@ export const FIXTURE_TEBLIGAT: Tebligat[] = [
     belgeNo: "2026-00012345",
     ulasmaTarihi: "2026-09-05T10:00:00.000Z",
     durum: "YENI",
-    kaynak: "EPOSTA",
-    epostaMesajId: "<f-1@posta>",
+    kaynak: "GIB",
+    gibBelgeId: "gib-f-1",
     olusturmaTarihi: "2026-09-05T10:00:00.000Z",
   },
   {
@@ -717,35 +718,44 @@ export const FIXTURE_TEBLIGAT: Tebligat[] = [
     durum: "ISLEM_YAPILDI",
     atananId: "p_2",
     not: "İzah dilekçesi verildi.",
-    kaynak: "EPOSTA",
-    epostaMesajId: "<f-2@posta>",
+    kaynak: "GIB",
+    gibBelgeId: "gib-f-2",
     olusturmaTarihi: "2026-07-01T10:00:00.000Z",
-  },
-  {
-    id: "tb_eslesmeyen",
-    vkn: "4840847211",
-    kurum: "GIB",
-    tur: "ODEME_EMRI",
-    konu: "Ödeme Emri",
-    ulasmaTarihi: "2026-09-20T10:00:00.000Z",
-    durum: "YENI",
-    kaynak: "EPOSTA",
-    epostaMesajId: "<f-3@posta>",
-    olusturmaTarihi: "2026-09-20T10:00:00.000Z",
   },
 ]
 
-export const FIXTURE_POSTA_KUTUSU: TebligatPostaKutusu = {
-  id: "pk_1",
-  durum: "BAGLI",
-  sunucu: "imap.ornek.com",
-  port: 993,
-  kullanici: "tebligat@primemusavirlik.com.tr",
-  klasor: "INBOX",
-  sifreIpucu: "abcd",
-  sonUid: 10,
-  sonTarama: "2026-09-22T07:30:00.000Z",
-  baglayanId: "p_1",
+export const FIXTURE_TEBLIGAT_ERISIM: TebligatErisim[] = [
+  {
+    id: "te_ltd",
+    mukellefId: "m_ltd",
+    kullaniciKodu: "0174520662",
+    sifreIpucu: "abcd",
+    durum: "AKTIF",
+    sonTarama: new Date(2026, 8, 23, 3, 0).toISOString(),
+    tanimlayanId: "p_1",
+    tanimlamaTarihi: "2026-06-01T09:00:00.000Z",
+  },
+  {
+    id: "te_as",
+    mukellefId: "m_as",
+    kullaniciKodu: "9358005601",
+    sifreIpucu: "wxyz",
+    durum: "HATA",
+    hataMesaji: "GİB şifresinin süresi dolmuş; İVD'den yenileyip buraya girin",
+    sonTarama: new Date(2026, 8, 20, 3, 0).toISOString(),
+    tanimlayanId: "p_1",
+    tanimlamaTarihi: "2026-06-01T09:00:00.000Z",
+  },
+]
+
+/** Referans günün (2026-09-23) gece taraması */
+export const FIXTURE_TEBLIGAT_TARAMA: TebligatTarama = {
+  id: "tt_1",
+  baslangic: new Date(2026, 8, 23, 3, 0).toISOString(),
+  bitis: new Date(2026, 8, 23, 3, 2).toISOString(),
+  taranan: 2,
+  hatali: 1,
+  yeni: 0,
 }
 
 /** Yalnızca e-posta kanalı bağlı; WhatsApp ve Telegram yapılandırılmamış */
@@ -948,7 +958,8 @@ export function createFixtureState(): DbState {
     kesintiAktarim: [],
     kesinti: [],
     tebligat: structuredClone(FIXTURE_TEBLIGAT),
-    postaKutusu: [structuredClone(FIXTURE_POSTA_KUTUSU)],
+    tebligatErisim: structuredClone(FIXTURE_TEBLIGAT_ERISIM),
+    tebligatTarama: [structuredClone(FIXTURE_TEBLIGAT_TARAMA)],
     kanal: structuredClone(FIXTURE_KANAL),
     bildirimTercihi: [],
     gonderim: [],

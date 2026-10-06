@@ -1,10 +1,5 @@
-import type { TebligatKapsam } from "@/types/api"
-import type {
-  PostaKutusuDurumu,
-  TebligatDurum,
-  TebligatKurum,
-  TebligatTur,
-} from "@/types/domain"
+import type { TebligatErisimSatirDurumu, TebligatKapsam } from "@/types/api"
+import type { TebligatDurum, TebligatKurum, TebligatTur } from "@/types/domain"
 
 export const SAYFA_BOYUTU = 20
 
@@ -32,12 +27,11 @@ export const KURUM_ETIKET: Record<TebligatKurum, string> = {
 export const KAPSAM_ETIKET: Record<TebligatKapsam, string> = {
   acik: "Açık",
   acil: "Acil / geciken",
-  eslesmeyen: "Eşleşmeyen",
   kapali: "Kapalı",
 }
 
-export const POSTA_DURUM_ETIKET: Record<PostaKutusuDurumu, string> = {
-  BAGLI: "Bağlı",
-  HATA: "Hatalı",
-  BAGLI_DEGIL: "Bağlı değil",
+export const ERISIM_DURUM_ETIKET: Record<TebligatErisimSatirDurumu, string> = {
+  AKTIF: "Taranıyor",
+  HATA: "Giriş başarısız",
+  TANIMSIZ: "Tanımlı değil",
 }

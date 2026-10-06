@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest"
 
-import { tebligatEpostasiAyristir } from "@/features/tebligat/eposta-ayristir"
 import {
   sonIslemTarihi,
   sureDurumu,
   tebligTarihi,
+  tebligatTuru,
 } from "@/features/tebligat/kurallar"
-import { tebligatEpostasiOlustur } from "@/mocks/posta/mock-adapter"
 
 /** Yerel saatle ulaşma anı (ISO) */
 const ulasma = (ymd: string, saat = 10) =>
@@ -67,50 +66,15 @@ describe("e-Tebligat süreleri", () => {
   })
 })
 
-describe("bildirim e-postası ayrıştırma", () => {
-  it("VKN, tür, kurum, belge no ve ulaşma anını çıkarır", () => {
-    const e = tebligatEpostasiOlustur({
-      mesajId: "<1@x>",
-      vkn: "0174520662",
-      unvan: "Çınar Yazılım 1234567890 Ltd.",
-      tur: "IZAHA_DAVET",
-      kurum: "GIB",
-      belgeNo: "2026-00012345",
-      ulasma: new Date(2026, 8, 20, 14, 30),
-    })
-    expect(tebligatEpostasiAyristir(e)).toEqual({
-      vkn: "0174520662",
-      kurum: "GIB",
-      tur: "IZAHA_DAVET",
-      konu: "İzaha Davet Yazısı",
-      belgeNo: "2026-00012345",
-      ulasmaTarihi: new Date(2026, 8, 20, 14, 30).toISOString(),
-    })
-  })
-
-  it("SGK ve ihbarname tanınır; tebligat olmayan e-posta null", () => {
-    const sgk = tebligatEpostasiOlustur({
-      mesajId: "<2@x>",
-      vkn: "10000000146",
-      unvan: "Ali Veli",
-      tur: "VERGI_CEZA_IHBARNAMESI",
-      kurum: "SGK",
-      belgeNo: "2026-1",
-      ulasma: new Date(2026, 8, 20),
-    })
-    expect(tebligatEpostasiAyristir(sgk)).toMatchObject({
-      vkn: "10000000146",
-      kurum: "SGK",
-      tur: "VERGI_CEZA_IHBARNAMESI",
-    })
-    expect(
-      tebligatEpostasiAyristir({
-        mesajId: "<3@x>",
-        gonderen: "bulten@ornek.com",
-        konu: "Bülten",
-        govde: "0174520662 numaralı…",
-        tarih: new Date().toISOString(),
-      })
-    ).toBeNull()
+describe("GİB belge türü sınıflama", () => {
+  it("GİB belge türü metninden tebligat türü", () => {
+    expect(tebligatTuru("Ödeme Emri")).toBe("ODEME_EMRI")
+    expect(tebligatTuru("VERGİ/CEZA İHBARNAMESİ")).toBe(
+      "VERGI_CEZA_IHBARNAMESI"
+    )
+    expect(tebligatTuru("İzaha Davet Yazısı")).toBe("IZAHA_DAVET")
+    expect(tebligatTuru("Bilgi ve Belge İsteme")).toBe("BILGI_ISTEME")
+    expect(tebligatTuru("Defter ve Belgelerin İbrazı")).toBe("INCELEME")
+    expect(tebligatTuru("Mükellefiyet bilgilendirmesi")).toBe("DIGER")
   })
 })

@@ -1,14 +1,15 @@
 import { http } from "@/lib/http"
 import type {
-  PostaKutusuKaydetRequest,
   TebligatBelgeRequest,
   TebligatEkleRequest,
+  TebligatErisimKaydetRequest,
+  TebligatErisimListParams,
+  TebligatErisimSatiri,
   TebligatGuncelleRequest,
   TebligatListParams,
   TebligatListResponse,
+  TebligatMukellefTaraResponse,
   TebligatOzetResponse,
-  TebligatPostaKutusuView,
-  TebligatTaraResponse,
   TebligatView,
 } from "@/types/api"
 import type { Gorev } from "@/types/domain"
@@ -26,10 +27,18 @@ export const tebligatApi = {
   gorevOlustur: (id: string) => http.post<Gorev>(`/tebligat/${id}/gorev`),
   belgeYukle: (id: string, body: TebligatBelgeRequest) =>
     http.post<TebligatView>(`/tebligat/${id}/belge`, body),
-  tara: () => http.post<TebligatTaraResponse>("/tebligat/tara"),
-  postaKutusu: () =>
-    http.get<TebligatPostaKutusuView | null>("/tebligat/posta-kutusu"),
-  postaKutusuKaydet: (body: PostaKutusuKaydetRequest) =>
-    http.put<TebligatPostaKutusuView>("/tebligat/posta-kutusu", body),
-  postaKutusuKaldir: () => http.delete<void>("/tebligat/posta-kutusu"),
+  erisimler: (params: TebligatErisimListParams = {}) =>
+    http.get<TebligatErisimSatiri[]>("/tebligat/erisim", {
+      params: { ...params },
+    }),
+  erisim: (mukellefId: string) =>
+    http.get<TebligatErisimSatiri>(`/tebligat/erisim/${mukellefId}`),
+  erisimKaydet: (mukellefId: string, body: TebligatErisimKaydetRequest) =>
+    http.put<TebligatErisimSatiri>(`/tebligat/erisim/${mukellefId}`, body),
+  erisimKaldir: (mukellefId: string) =>
+    http.delete<void>(`/tebligat/erisim/${mukellefId}`),
+  mukellefTara: (mukellefId: string) =>
+    http.post<TebligatMukellefTaraResponse>(
+      `/tebligat/erisim/${mukellefId}/tara`
+    ),
 }
