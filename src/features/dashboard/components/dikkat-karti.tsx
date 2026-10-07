@@ -11,6 +11,7 @@ import {
   LegalDocument01Icon,
   PlugSocketIcon,
   Refresh01Icon,
+  UserMultiple02Icon,
 } from "@hugeicons/core-free-icons"
 
 import { EmptyState } from "@/components/shared/query-states"
@@ -26,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type {
   ArsivOzetResponse,
+  BordroOzetResponse,
   EBelgeOzetResponse,
   TebligatOzetResponse,
 } from "@/types/api"
@@ -75,6 +77,39 @@ function tebligatSatirlari(o: TebligatOzetResponse): Satir[] {
       to: "/tebligat?kapsam=acik",
       icon: LegalDocument01Icon,
       ton: "notr",
+    },
+  ]
+}
+
+function bordroSatirlari(o: BordroOzetResponse): Satir[] {
+  return [
+    {
+      etiket: "Bordro girdisi gelmedi",
+      deger: o.girdiBekleyen,
+      to: "/bordro?durum=BEKLENIYOR",
+      icon: UserMultiple02Icon,
+      ton: "uyari",
+    },
+    {
+      etiket: "MUHSGK süresi geçen bordro",
+      deger: o.geciken,
+      to: "/bordro?uyari=GECIKTI",
+      icon: UserMultiple02Icon,
+      ton: "tehlike",
+    },
+    {
+      etiket: "Süresi yaklaşan işe giriş / çıkış bildirimi",
+      deger: o.hareketYaklasan,
+      to: "/bordro?sekme=hareket",
+      icon: UserMultiple02Icon,
+      ton: "uyari",
+    },
+    {
+      etiket: "Geciken işe giriş / çıkış bildirimi",
+      deger: o.hareketGeciken,
+      to: "/bordro?sekme=hareket",
+      icon: UserMultiple02Icon,
+      ton: "tehlike",
     },
   ]
 }
@@ -223,17 +258,20 @@ export function DikkatKarti({
   tebligat,
   eBelge,
   arsiv,
+  bordro,
   className,
 }: {
   tebligat: Kaynak<TebligatOzetResponse>
   eBelge: Kaynak<EBelgeOzetResponse>
   arsiv: Kaynak<ArsivOzetResponse>
+  bordro: Kaynak<BordroOzetResponse>
   className?: string
 }) {
   const kaynaklar: { ad: string; k: Kaynak<unknown> }[] = [
     { ad: "e-Tebligat", k: tebligat },
     { ad: "e-Belge", k: eBelge },
     { ad: "Arşiv", k: arsiv },
+    { ad: "Bordro", k: bordro },
   ]
   const yukleniyor = kaynaklar.some(({ k }) => !k.hata && !k.data)
   const hatalar = kaynaklar.filter(({ k }) => k.hata)
@@ -241,6 +279,7 @@ export function DikkatKarti({
     ...(tebligat.data ? tebligatSatirlari(tebligat.data) : []),
     ...(eBelge.data ? eBelgeSatirlari(eBelge.data) : []),
     ...(arsiv.data ? arsivSatirlari(arsiv.data) : []),
+    ...(bordro.data ? bordroSatirlari(bordro.data) : []),
   ]
     .filter((s) => s.deger > 0)
     .sort((a, b) => TON_SIRASI.indexOf(a.ton) - TON_SIRASI.indexOf(b.ton))
@@ -249,7 +288,9 @@ export function DikkatKarti({
     <Card size="sm" className={className}>
       <CardHeader>
         <CardTitle>Dikkat gerektirenler</CardTitle>
-        <CardDescription>Tebligat, e-Belge ve belge uyarıları</CardDescription>
+        <CardDescription>
+          Tebligat, e-Belge, belge ve bordro uyarıları
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {yukleniyor && satirlar.length === 0 && hatalar.length === 0 ? (

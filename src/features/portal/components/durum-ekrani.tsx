@@ -75,7 +75,9 @@ export function DurumEkrani({
       aciklama = `${buro} evraklarınızı inceleyecek; eksik veya hatalı bir şey olursa sizinle iletişime geçecek.`
       break
     case "BASARI":
-      aciklama = `${yuklenenSayisi ?? 0} dosya ${buro} ekibine iletildi. Bu sayfayı kapatabilirsiniz.`
+      aciklama = yuklenenSayisi
+        ? `${yuklenenSayisi} dosya ${buro} ekibine iletildi. Bu sayfayı kapatabilirsiniz.`
+        : `Bildiriminiz ${buro} ekibine iletildi. Bu sayfayı kapatabilirsiniz.`
       break
   }
 

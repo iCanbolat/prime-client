@@ -184,12 +184,64 @@ describe("dosya işlemleri", () => {
       db.aktivite.where((a) => a.hedefId === dosya.id).map((a) => a.eylem)
     ).toEqual([
       "ARSIV_YUKLENDI",
+      "DOSYA_GORUNTULENDI",
       "ARSIV_GUNCELLENDI",
       "ARSIV_SILINDI",
       "ARSIV_GERI_ALINDI",
       "ARSIV_SILINDI",
       "ARSIV_KALICI_SILINDI",
     ])
+  })
+
+  it("bordro dosyası döneme bağlanır, dönemle filtrelenir; dönem dışı kategoride alanlar silinir", async () => {
+    const bordro = await http.post<ArsivDosyaView>(
+      "/arsiv",
+      yukleme({
+        kategori: "BORDRO",
+        ad: "pusula.png",
+        donem: "2026-08",
+        bordroBelge: "PUSULA",
+      })
+    )
+    expect(bordro).toMatchObject({ donem: "2026-08", bordroBelge: "PUSULA" })
+    // Dönem dışı kategoride yükleme alanları yok sayılır
+    const imza = await http.post<ArsivDosyaView>(
+      "/arsiv",
+      yukleme({ donem: "2026-08", bordroBelge: "ICMAL" })
+    )
+    expect(imza.donem).toBeUndefined()
+
+    expect(
+      (await liste({ mukellefId: "m_ltd", donem: "2026-08" })).map((d) => d.id)
+    ).toEqual([bordro.id])
+
+    const tur = await http.patch<ArsivDosyaView>(`/arsiv/${bordro.id}`, {
+      bordroBelge: "IMZALI",
+    })
+    expect(tur).toMatchObject({ donem: "2026-08", bordroBelge: "IMZALI" })
+    // Dönem kaldırılınca tür de düşer
+    const donemsiz = await http.patch<ArsivDosyaView>(`/arsiv/${bordro.id}`, {
+      donem: null,
+    })
+    expect(donemsiz.bordroBelge).toBeUndefined()
+
+    await http.patch(`/arsiv/${bordro.id}`, {
+      donem: "2026-07",
+      bordroBelge: "ICMAL",
+    })
+    const tasindi = await http.patch<ArsivDosyaView>(`/arsiv/${bordro.id}`, {
+      kategori: "DIGER",
+    })
+    expect(tasindi.donem).toBeUndefined()
+    expect(tasindi.bordroBelge).toBeUndefined()
+
+    const hata = (body: unknown) =>
+      http.patch(`/arsiv/${bordro.id}`, body).then(
+        () => 200,
+        (e: unknown) => (e instanceof ApiError ? e.status : 0)
+      )
+    expect(await hata({ donem: "2026-13" })).toBe(400)
+    expect(await hata({ bordroBelge: "MAAS" })).toBe(400)
   })
 
   it("seed dosyasının içeriği yoksa placeholder üretir", async () => {

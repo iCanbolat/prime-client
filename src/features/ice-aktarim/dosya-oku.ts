@@ -70,7 +70,9 @@ export async function tabloSatirlari(dosya: File): Promise<unknown[][]> {
   const XLSX = await import("xlsx")
   const veri = await dosya.arrayBuffer()
   const kitap = /\.(csv|txt)$/i.test(dosya.name)
-    ? XLSX.read(csvCoz(veri), { type: "string" })
+    ? // raw: hücreler metin kalır. Aksi halde SheetJS "33030,00" gibi Türkçe ondalıkları
+      // binlik ayraçlı sayı sanıp 3303000'e çevirir (";" ayracı yine otomatik bulunur).
+      XLSX.read(csvCoz(veri), { type: "string", raw: true })
     : XLSX.read(veri, { type: "array" })
   const ad = kitap.SheetNames[0]
   if (!ad) return []

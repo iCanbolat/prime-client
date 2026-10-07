@@ -15,7 +15,6 @@ import {
 } from "@/features/takvim/motor"
 import { formatDonem, formatTRY } from "@/lib/format"
 import { bugun } from "@/lib/tarih"
-import { putBlob } from "@/mocks/blob-store"
 import { db } from "@/mocks/db"
 import {
   api,
@@ -24,9 +23,9 @@ import {
   notFound,
   requireActor,
 } from "@/mocks/handlers/common"
+import { DATA_URL_RE, arsiveYaz } from "@/mocks/handlers/ortak-islemler"
 import { beyanDurumuOku, beyanDurumuYaz } from "@/mocks/handlers/takvim"
 import type {
-  IceAktarDosya,
   IceAktarSonucu,
   MizanDetay,
   MizanIceAktarRequest,
@@ -36,16 +35,9 @@ import type {
   TahakkukIceAktarResponse,
   TahakkukView,
 } from "@/types/api"
-import type {
-  ArsivKategori,
-  Mizan,
-  Mukellef,
-  Personel,
-  Tahakkuk,
-} from "@/types/domain"
+import type { Mizan, Mukellef, Personel, Tahakkuk } from "@/types/domain"
 
 const MIZAN_KONTROL_MADDESI = "Mizan kontrol edildi"
-const DATA_URL_RE = /^data:([\w/+.-]+);base64,/
 
 /** Dönemin ilk günü (yyyy-MM-dd): "2026-08" → 08-01, "2026-Q3" → 07-01, "2025" → 01-01 */
 function donemBaslangici(donem: string): string {
@@ -54,29 +46,6 @@ function donemBaslangici(donem: string): string {
     return `${ceyrek[1]}-${String(Number(ceyrek[2]) * 3 - 2).padStart(2, "0")}-01`
   if (/^\d{4}$/.test(donem)) return `${donem}-01-01`
   return `${donem}-01`
-}
-
-async function arsiveYaz(
-  mukellefId: string,
-  kategori: ArsivKategori,
-  dosya: IceAktarDosya,
-  actor: Personel
-) {
-  const mimeType = DATA_URL_RE.exec(dosya.dataUrl)?.[1] ?? "application/pdf"
-  const kayit = db.arsiv.insert({
-    mukellefId,
-    kategori,
-    ad: dosya.ad,
-    mimeType,
-    boyut: Math.round(
-      ((dosya.dataUrl.length - dosya.dataUrl.indexOf(",")) * 3) / 4
-    ),
-    yukleyenId: actor.id,
-    yuklemeTarihi: new Date().toISOString(),
-    silindi: false,
-  })
-  await putBlob(kayit.id, dosya.dataUrl)
-  return kayit.id
 }
 
 function tahakkukDogrula(

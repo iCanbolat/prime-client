@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
+  DonemBadge,
   DosyaIkonu,
   GecerlilikBadge,
 } from "@/features/arsiv/components/dosya-gorsel"
@@ -167,6 +168,7 @@ export function DosyaGrid({
                 {ARSIV_KATEGORI_ETIKET[d.kategori]}
               </Badge>
             )}
+            <DonemBadge dosya={d} />
             <GecerlilikBadge tarih={d.gecerlilikTarihi} />
             <span className="ml-auto tabular-nums">{formatBoyut(d.boyut)}</span>
           </div>
@@ -226,7 +228,10 @@ export function DosyaTablo({
                 </TableCell>
               )}
               <TableCell className="hidden md:table-cell">
-                {ARSIV_KATEGORI_ETIKET[d.kategori]}
+                <span className="grid justify-items-start gap-1">
+                  {ARSIV_KATEGORI_ETIKET[d.kategori]}
+                  <DonemBadge dosya={d} />
+                </span>
               </TableCell>
               <TableCell className="hidden sm:table-cell">
                 {d.gecerlilikTarihi ? (

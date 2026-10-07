@@ -9,13 +9,15 @@ export const aktiviteHandlers = [
     const params = new URL(request.url).searchParams
     const mukellefId = params.get("mukellefId")
     const hedefId = params.get("hedefId")
+    const eylemler = params.get("eylem")?.split(",").filter(Boolean)
     const limit = Math.min(Number(params.get("limit")) || 20, 100)
 
     const items: AktiviteKaydi[] = db.aktivite
       .where(
         (a) =>
           (!mukellefId || a.mukellefId === mukellefId) &&
-          (!hedefId || a.hedefId === hedefId)
+          (!hedefId || a.hedefId === hedefId) &&
+          (!eylemler?.length || eylemler.includes(a.eylem))
       )
       .sort((a, b) => b.zaman.localeCompare(a.zaman))
       .slice(0, limit)

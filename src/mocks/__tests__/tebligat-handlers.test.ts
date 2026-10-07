@@ -219,6 +219,74 @@ describe("GİB erişimi", () => {
   })
 })
 
+describe("kasadan aktarım", () => {
+  const ivdKaydi = (mukellefId: string, sistem: "IVD" | "GIB" = "IVD") =>
+    db.credential.insert({
+      mukellefId,
+      sistem,
+      kullaniciAdi: "10000000146",
+      cipherText: "eA==",
+      iv: "eA==",
+      sonGuncelleme: new Date(2026, 8, 1).toISOString(),
+      guncelleyenId: "p_1",
+    })
+
+  it("kaynak kasa kaydı saklanır, erişim geçmişine yazılır; kasa sonradan değişince 'daha yeni' döner", async () => {
+    const k = ivdKaydi("m_sahis")
+    const s = await http.put<TebligatErisimSatiri>("/tebligat/erisim/m_sahis", {
+      kullaniciKodu: "10000000146",
+      sifre: "kasadaki-sifre",
+      kasaCredentialId: k.id,
+    })
+    expect(s).toMatchObject({
+      kasaKaydiId: k.id,
+      kasaDahaYeni: false,
+      erisim: {
+        kasaKaynagi: {
+          credentialId: k.id,
+          credentialGuncelleme: k.sonGuncelleme,
+        },
+      },
+    })
+    expect(
+      db.aktivite.where(
+        (a) => a.eylem === "SIFRE_TEBLIGATA_AKTARILDI" && a.hedefId === k.id
+      )
+    ).toHaveLength(1)
+
+    db.credential.update(k.id, {
+      sonGuncelleme: new Date(2026, 8, 20).toISOString(),
+    })
+    expect(
+      (await http.get<TebligatErisimSatiri>("/tebligat/erisim/m_sahis"))
+        .kasaDahaYeni
+    ).toBe(true)
+
+    // Elle girilen şifre kasa bağını koparır
+    const elle = await http.put<TebligatErisimSatiri>(
+      "/tebligat/erisim/m_sahis",
+      { kullaniciKodu: "10000000146", sifre: "elle-girilen" }
+    )
+    expect(elle.erisim?.kasaKaynagi).toBeUndefined()
+    expect(elle.kasaDahaYeni).toBe(false)
+  })
+
+  it("başka mükellefin ya da İnteraktif VD olmayan kayıt reddedilir", async () => {
+    const baska = ivdKaydi("m_as")
+    const gib = ivdKaydi("m_sahis", "GIB")
+    for (const id of [baska.id, gib.id])
+      expect(
+        await hataDurumu(
+          http.put("/tebligat/erisim/m_sahis", {
+            kullaniciKodu: "10000000146",
+            sifre: "kasadaki-sifre",
+            kasaCredentialId: id,
+          })
+        )
+      ).toBe(400)
+  })
+})
+
 describe("güncelleme, görev ve belge", () => {
   it("sorumlu atanınca bildirim gider", async () => {
     oturum(yonetici)

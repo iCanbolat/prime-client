@@ -30,7 +30,7 @@ const SENARYOLAR: Senaryo[] = [
   { durum: "IPTAL", gun: 10 },
 ]
 
-const AYLIK: IstenenEvrak[] = ["FIS_FATURA", "BANKA_EKSTRESI", "SGK_BELGELERI"]
+const AYLIK: IstenenEvrak[] = ["FIS_FATURA", "BANKA_EKSTRESI", "PUANTAJ"]
 const TEK_SEFER: IstenenEvrak[] = [
   "KIRA_SOZLESMESI",
   "KIMLIK",

@@ -3,9 +3,14 @@ import { File01Icon, Image01Icon, Pdf01Icon } from "@hugeicons/core-free-icons"
 
 import { Badge } from "@/components/ui/badge"
 import { gecerlilikDurumu, kalanGun } from "@/features/arsiv/kurallar"
-import { formatDate } from "@/lib/format"
+import {
+  BORDRO_BELGE_ETIKET,
+  BORDRO_BELGE_KISA,
+} from "@/features/bordro/sabitler"
+import { formatDate, formatDonem } from "@/lib/format"
 import { bugun } from "@/lib/tarih"
 import { cn } from "@/lib/utils"
+import type { ArsivDosya } from "@/types/domain"
 
 export function DosyaIkonu({
   mimeType,
@@ -81,6 +86,29 @@ export function GecerlilikBadge({
   return (
     <Badge variant="outline" className={cn("text-muted-foreground", className)}>
       {formatDate(tarih)}'e kadar
+    </Badge>
+  )
+}
+
+/** Döneme bağlı belgede "Ağustos 2026 · Ücret hesap pusulaları" rozeti */
+export function DonemBadge({
+  dosya,
+  className,
+}: {
+  dosya: Pick<ArsivDosya, "donem" | "bordroBelge">
+  className?: string
+}) {
+  if (!dosya.donem) return null
+  return (
+    <Badge
+      variant="outline"
+      className={cn("max-w-full truncate", className)}
+      title={
+        dosya.bordroBelge ? BORDRO_BELGE_ETIKET[dosya.bordroBelge] : undefined
+      }
+    >
+      {formatDonem(dosya.donem)}
+      {dosya.bordroBelge && ` · ${BORDRO_BELGE_KISA[dosya.bordroBelge]}`}
     </Badge>
   )
 }

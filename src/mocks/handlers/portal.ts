@@ -5,6 +5,12 @@
 import { HttpResponse, http } from "msw"
 
 import { MAKS_DOSYA_BOYUTU, dosyaMimeTuru } from "@/features/arsiv/kurallar"
+import {
+  BORDRO_DONEM_RE,
+  bordroKayitId,
+  bordroUygulanirMi,
+} from "@/features/bordro/kurallar"
+import { donemEtiketi } from "@/features/takvim/motor"
 import { talepDurumu } from "@/features/evrak-talebi/durum"
 import {
   ISTENEN_EVRAKLAR,
@@ -12,6 +18,7 @@ import {
 } from "@/features/evrak-talebi/sabitler"
 import { delBlob, putBlob } from "@/mocks/blob-store"
 import { db } from "@/mocks/db"
+import { bordroKaydiYaz } from "@/mocks/handlers/bordro-islemleri"
 import {
   api,
   errorResponse,
@@ -42,6 +49,7 @@ function portalYaniti(t: EvrakTalebi): PortalResponse {
     donem: t.donem,
     aciklama: t.aciklama,
     sonKullanma: t.sonKullanma,
+    degisiklikYokSecilebilir: degisiklikYokSecilebilir(t),
     yuklemeler: db.gelen
       .where((g) => g.talepId === t.id)
       .sort((a, b) => a.yuklemeTarihi.localeCompare(b.yuklemeTarihi))
@@ -56,6 +64,16 @@ function portalYaniti(t: EvrakTalebi): PortalResponse {
         yuklemeTarihi: g.yuklemeTarihi,
       })),
   }
+}
+
+/** Dönemli, puantaj istenen ve mükellefin bordrosu olan talepte "değişiklik yok" seçilebilir */
+function degisiklikYokSecilebilir(t: EvrakTalebi) {
+  const m = db.mukellef.find(t.mukellefId)
+  return (
+    t.istenenler.includes("PUANTAJ") &&
+    Boolean(t.donem && BORDRO_DONEM_RE.test(t.donem)) &&
+    Boolean(m && bordroUygulanirMi(m))
+  )
 }
 
 /** Aktif değilse uygun hata yanıtı */
@@ -160,10 +178,33 @@ export const portalHandlers = [
       const bekleyen = db.gelen.count(
         (g) => g.talepId === t.id && g.durum === "BEKLIYOR"
       )
-      if (bekleyen === 0)
+      const body = await request.json()
+      const degisiklikYok = body.degisiklikYok === true
+      if (degisiklikYok && !degisiklikYokSecilebilir(t))
+        return errorResponse(400, "Bu talepte değişiklik yok bildirilemez")
+      if (bekleyen === 0 && !degisiklikYok)
         return errorResponse(400, "Göndermeden önce en az bir dosya yükleyin")
 
-      const not = (await request.json()).not?.trim().slice(0, MAKS_NOT)
+      const not = body.not?.trim().slice(0, MAKS_NOT)
+      if (degisiklikYok) {
+        // Puantaj dosyası yerine "değişiklik yok": bordro dönemi "Girdi geldi" olur. MUHSGK
+        // görev maddesi büroda personel tarafından işaretlenir (müşteri personel değildir).
+        const kayit = db.bordro.find(bordroKayitId(t.mukellefId, t.donem!))
+        bordroKaydiYaz(
+          t.mukellefId,
+          t.donem!,
+          {
+            girdiTalepId: t.id,
+            degisiklikYok: true,
+            ...((!kayit || kayit.durum === "BEKLENIYOR") && {
+              durum: "GIRDI_GELDI" as const,
+            }),
+          },
+          { id: MUSTERI_AKTOR_ID },
+          "BORDRO_GUNCELLENDI",
+          `${donemEtiketi(t.donem!)}: müşteri puantajda değişiklik olmadığını bildirdi`
+        )
+      }
       const guncel = db.talep.update(t.id, {
         durum: "TAMAMLANDI",
         tamamlanmaTarihi: new Date().toISOString(),
@@ -175,7 +216,11 @@ export const portalHandlers = [
         hedefTip: "EVRAK",
         hedefId: t.id,
         mukellefId: t.mukellefId,
-        aciklama: `${bekleyen} dosya`,
+        aciklama: degisiklikYok
+          ? bekleyen
+            ? `${bekleyen} dosya · puantajda değişiklik yok`
+            : "Puantajda değişiklik yok"
+          : `${bekleyen} dosya`,
       })
       return HttpResponse.json(portalYaniti(guncel))
     }

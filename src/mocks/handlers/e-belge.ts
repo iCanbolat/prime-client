@@ -29,6 +29,7 @@ import {
   api,
   errorResponse,
   logActivity,
+  logDosyaErisimi,
   notFound,
   requireActor,
   turkishIncludes,
@@ -484,11 +485,19 @@ export const eBelgeHandlers = [
 
   http.get<{ id: string }>(
     api("/e-belge/faturalar/:id/icerik"),
-    async ({ params }) => {
+    async ({ params, request }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
       const e = db.ebelge.find(params.id)
       if (!e) return notFound("Fatura bulunamadı")
       const b = db.baglanti.where((n) => n.mukellefId === e.mukellefId)[0]
       if (!b) return errorResponse(409, "Mükellefin Luca bağlantısı yok")
+      logDosyaErisimi(request, actor, {
+        hedefTip: "EBELGE",
+        hedefId: e.id,
+        mukellefId: e.mukellefId,
+        ad: `${e.belgeNo}.pdf`,
+      })
       return HttpResponse.json({
         dataUrl: await adapter.faturaIcerik(kimlik(b), e.ettn, "PDF"),
         ad: `${e.belgeNo}.pdf`,

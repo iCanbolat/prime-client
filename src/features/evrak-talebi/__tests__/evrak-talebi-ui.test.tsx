@@ -127,6 +127,37 @@ describe("Evrak talepleri sayfası", () => {
 })
 
 describe("Talep oluşturma", () => {
+  it("bordro / SGK evrakı seçilince bağlantı süresi 3 güne iner; elle seçilen süre korunur", async () => {
+    const { user } = renderRoute("/mukellefler/m_ltd/genel", {
+      as: TEST_USERS.personel,
+    })
+    await user.click(await screen.findByRole("button", { name: "Evrak iste" }))
+    const dialog = await screen.findByRole("dialog", { name: "Evrak iste" })
+    const sure = within(dialog).getByRole("combobox", {
+      name: "Bağlantı geçerliliği",
+    })
+    expect(sure).toHaveTextContent("7 gün")
+
+    await user.click(
+      within(dialog).getByRole("checkbox", {
+        name: "Puantaj / ek ödeme-kesinti bilgisi",
+      })
+    )
+    expect(sure).toHaveTextContent("3 gün")
+    expect(
+      within(dialog).getByText(
+        "Bordro / SGK evrakı: bağlantı kısa süreli tutulur."
+      )
+    ).toBeInTheDocument()
+
+    await user.click(
+      within(dialog).getByRole("checkbox", {
+        name: "Puantaj / ek ödeme-kesinti bilgisi",
+      })
+    )
+    expect(sure).toHaveTextContent("7 gün")
+  })
+
   it("mükellef kartından: talep oluşturulur, mesaj önizlenir, WhatsApp bağlantısı ve gönderim kaydı", async () => {
     const { user } = renderRoute("/mukellefler/m_ltd/genel", {
       as: TEST_USERS.personel,
@@ -145,7 +176,7 @@ describe("Talep oluşturma", () => {
     )
     await user.click(
       within(dialog).getByRole("checkbox", {
-        name: "SGK işe giriş / çıkış belgeleri",
+        name: "İşe giriş / çıkış belgeleri",
       })
     )
     await user.click(
@@ -156,15 +187,13 @@ describe("Talep oluşturma", () => {
     const talep = db.talep.where(
       (t) => t.mukellefId === "m_ltd" && t.id !== "e_aktif"
     )[0]!
-    expect(talep.istenenler).toEqual(["FIS_FATURA", "SGK_BELGELERI"])
+    expect(talep.istenenler).toEqual(["FIS_FATURA", "ISE_GIRIS_CIKIS"])
     const mesaj = (
       within(gonder).getByLabelText("Mesaj") as HTMLTextAreaElement
     ).value
     expect(mesaj).toContain("Merhaba Çınar Yazılım San. ve Tic. Ltd. Şti.")
     expect(mesaj).toContain(`/p/${talep.token}`)
-    expect(mesaj).toContain(
-      "aylık fiş / fatura, sgk işe giriş / çıkış belgeleri"
-    )
+    expect(mesaj).toContain("aylık fiş / fatura, işe giriş / çıkış belgeleri")
 
     const wa = within(gonder).getByRole("link", { name: "WhatsApp'ta aç" })
     expect(wa.getAttribute("href")).toMatch(

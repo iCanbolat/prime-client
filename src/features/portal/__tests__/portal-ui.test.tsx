@@ -137,6 +137,45 @@ describe("Müşteri portalı", () => {
     ).toBeDisabled()
   })
 
+  it("puantajda “Bu ay değişiklik yok” ile dosyasız gönderilir; bordro dönemi girdi geldi olur", async () => {
+    db.talep.insert({
+      ...db.talep.find("e_aktif")!,
+      id: "e_puantaj",
+      token: "tkn_puantaj",
+      istenenler: ["PUANTAJ"],
+    })
+    const { user } = renderRoute("/p/tkn_puantaj")
+    const satir = await screen.findByRole("listitem", {
+      name: "Puantaj / ek ödeme-kesinti bilgisi",
+    })
+    const gonder = screen.getByRole("button", { name: "Gönderimi tamamla" })
+    expect(gonder).toBeDisabled()
+
+    await user.click(
+      within(satir).getByRole("checkbox", { name: /Bu ay değişiklik yok/ })
+    )
+    expect(within(satir).getByLabelText("Yüklendi")).toBeInTheDocument()
+    expect(screen.getByText("1 / 1 evrak")).toBeInTheDocument()
+    await user.click(gonder)
+
+    expect(
+      await screen.findByText(/Bildiriminiz .* ekibine iletildi/)
+    ).toBeInTheDocument()
+    expect(db.bordro.find("m_ltd:2026-08")).toMatchObject({
+      durum: "GIRDI_GELDI",
+      degisiklikYok: true,
+      girdiTalepId: "e_puantaj",
+    })
+  })
+
+  it("puantaj istenmeyen talepte “değişiklik yok” seçeneği çıkmaz", async () => {
+    renderRoute("/p/tkn_aktif")
+    await screen.findByRole("list", { name: "İstenen evraklar" })
+    expect(
+      screen.queryByRole("checkbox", { name: /Bu ay değişiklik yok/ })
+    ).not.toBeInTheDocument()
+  })
+
   it("reddedilen dosya nedeniyle birlikte gösterilir", async () => {
     db.talep.update("e_tamam", { durum: "AKTIF" })
     renderRoute("/p/tkn_tamam")

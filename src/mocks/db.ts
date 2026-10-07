@@ -9,11 +9,13 @@ import type {
   AktiviteLog,
   ArsivDosya,
   Bildirim,
+  BordroDonemi,
   EBelge,
   EDefterBerat,
   EvrakTalebi,
   GelenEvrak,
   Gorev,
+  IsHareketi,
   Buro,
   Credential,
   KasaMeta,
@@ -99,9 +101,13 @@ export interface DbState {
   fisHesapAyari: FisHesapAyari[]
   /** İndirilen Luca Excel dosyaları */
   lucaAktarim: LucaAktarim[]
+  /** Mükellef × ay bordro kayıtları (yalnızca işlem yapılanlar; id = `${mukellefId}:${donem}`) */
+  bordro: BordroDonemi[]
+  /** İşe giriş / çıkış bildirim takibi */
+  isHareketi: IsHareketi[]
 }
 
-export const STORAGE_KEY = "prime-ofis:db:v13"
+export const STORAGE_KEY = "prime-ofis:db:v16"
 
 const ID_PREFIX: Record<keyof DbState, string> = {
   buro: "b",
@@ -136,6 +142,8 @@ const ID_PREFIX: Record<keyof DbState, string> = {
   fis: "mf",
   fisHesapAyari: "fh",
   lucaAktarim: "la",
+  bordro: "bo",
+  isHareketi: "ih",
 }
 
 let state: DbState | null = null
@@ -278,6 +286,8 @@ export const db = {
   fis: collection("fis"),
   fisHesapAyari: collection("fisHesapAyari"),
   lucaAktarim: collection("lucaAktarim"),
+  bordro: collection("bordro"),
+  isHareketi: collection("isHareketi"),
 }
 
 /** Veritabanını seed'e sıfırlar (Ayarlar → Geliştirici ve testler). */

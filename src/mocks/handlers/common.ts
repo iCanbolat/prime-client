@@ -57,6 +57,43 @@ export function requireActor(request: Request): Personel | Response {
   )
 }
 
+/** `?islem=indir` ise indirme, aksi halde görüntüleme sayılır */
+export function dosyaErisimIslemi(request: Request): "onizle" | "indir" {
+  return new URL(request.url).searchParams.get("islem") === "indir"
+    ? "indir"
+    : "onizle"
+}
+
+/**
+ * Dosya içeriği her okunduğunda sunucu tarafında erişim kaydı yazar (bildirim üretmez).
+ * Bordro gibi hassas dosyaların kimin tarafından açıldığı bu kayıttan izlenir.
+ */
+export function logDosyaErisimi(
+  request: Request,
+  actor: Personel,
+  dosya: {
+    hedefTip: "ARSIV" | "EVRAK" | "EBELGE"
+    hedefId: string
+    mukellefId: string
+    ad: string
+  }
+) {
+  logActivity(
+    {
+      aktorId: actor.id,
+      eylem:
+        dosyaErisimIslemi(request) === "indir"
+          ? "DOSYA_INDIRILDI"
+          : "DOSYA_GORUNTULENDI",
+      hedefTip: dosya.hedefTip,
+      hedefId: dosya.hedefId,
+      mukellefId: dosya.mukellefId,
+      aciklama: dosya.ad,
+    },
+    false
+  )
+}
+
 /**
  * Aktiviteye yazar ve kurallara göre bildirim üretir (`bildirim-kurallari.ts`).
  * `bildirim` ile alıcılar / tür kural dışında belirlenebilir; `false` bildirimi kapatır.

@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react"
 import { useSearchParams } from "react-router"
 
 import { KATEGORI_SIRASI } from "@/features/arsiv/kurallar"
+import { BORDRO_DONEM_RE } from "@/features/bordro/kurallar"
 import { useIsDar } from "@/hooks/use-mobile"
 import type { ArsivListParams, ArsivSiralama, SiralamaYonu } from "@/types/api"
 import type { ArsivKategori } from "@/types/domain"
@@ -39,6 +40,8 @@ export interface ArsivParams {
   gecerlilik?: ArsivGecerlilikFiltresi
   /** Mükellef seçili değilken tüm mükelleflerin eksik zorunlu evrakları gösterilir */
   eksik: boolean
+  /** "2026-08": yalnızca bu döneme bağlı belgeler (bordro sayfasından gelinir) */
+  donem?: string
   /** 1 tabanlı */
   sayfa: number
 }
@@ -56,12 +59,13 @@ type ArsivParamPatch = Partial<{
   cop: boolean | null
   gecerlilik: ArsivGecerlilikFiltresi | null
   eksik: boolean | null
+  donem: string | null
   sayfa: number | null
 }>
 
 /**
  * Arşiv gezgini durumu URL'de: /arsiv?mukellef=m_001&kategori=VERGI_LEVHASI&q=...&gorunum=liste&cop=1&sayfa=2
- * &gecerlilik=doldu|yakinda&eksik=1
+ * &gecerlilik=doldu|yakinda&eksik=1&donem=2026-08
  * Varsayılanlar (ad ↑, ızgara) URL'e yazılmaz.
  */
 export function useArsivParams() {
@@ -72,6 +76,7 @@ export function useArsivParams() {
     const kategori = searchParams.get("kategori") as ArsivKategori | null
     const sirala = searchParams.get("sirala") as ArsivSiralama | null
     const sayfa = Number(searchParams.get("sayfa"))
+    const donem = searchParams.get("donem")
     return {
       mukellef: searchParams.get("mukellef") ?? undefined,
       kategori:
@@ -85,6 +90,7 @@ export function useArsivParams() {
       cop: searchParams.get("cop") === "1",
       gecerlilik: GECERLILIK_URL[searchParams.get("gecerlilik") ?? ""],
       eksik: searchParams.get("eksik") === "1",
+      donem: donem && BORDRO_DONEM_RE.test(donem) ? donem : undefined,
       sayfa: Number.isInteger(sayfa) && sayfa > 0 ? sayfa : 1,
     }
   }, [searchParams, dar])
@@ -101,6 +107,12 @@ export function useArsivParams() {
               next.set(key, String(value).toLowerCase())
             else if (value) next.set(key, String(value))
           }
+          // Başka klasöre geçilince dönem filtresi bırakılır
+          if (
+            !("donem" in patch) &&
+            ("mukellef" in patch || "kategori" in patch || "cop" in patch)
+          )
+            next.delete("donem")
           // Filtre/klasör/sıralama değişince ilk sayfaya dönülür (görünüm hariç)
           const yalnizGorunum = Object.keys(patch).every((k) => k === "gorunum")
           if (!("sayfa" in patch) && !yalnizGorunum) next.delete("sayfa")

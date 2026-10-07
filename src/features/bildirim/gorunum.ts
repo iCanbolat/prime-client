@@ -90,6 +90,8 @@ const OZEL: Partial<Record<BildirimTur, BildirimKategori>> = {
   BELGE_GECERLILIK: "uyari",
   EFATURA_YANIT_SURESI: "uyari",
   BEYAN_YAKLASIYOR: "uyari",
+  BORDRO_GIRDI_BEKLIYOR: "uyari",
+  ISE_HAREKETI_SURE: "uyari",
   EFATURA_REDDEDILDI: "uyari",
   ENTEGRATOR_BAGLANTI_KALDIRILDI: "uyari",
   SIFRE_SILINDI: "uyari",

@@ -1,6 +1,7 @@
 import { aktiviteHandlers } from "@/mocks/handlers/aktivite"
 import { arsivHandlers } from "@/mocks/handlers/arsiv"
 import { bildirimHandlers } from "@/mocks/handlers/bildirim"
+import { bordroHandlers } from "@/mocks/handlers/bordro"
 import { authHandlers } from "@/mocks/handlers/auth"
 import { buroHandlers } from "@/mocks/handlers/buro"
 import { simulationHandler } from "@/mocks/handlers/common"
@@ -39,6 +40,7 @@ export const handlers = [
   ...fisAktarimiHandlers,
   ...tahsilatHandlers,
   ...tebligatHandlers,
+  ...bordroHandlers,
   ...kanalHandlers,
   ...bildirimHandlers,
 ]

@@ -35,3 +35,6 @@ export const ERISIM_DURUM_ETIKET: Record<TebligatErisimSatirDurumu, string> = {
   HATA: "Giriş başarısız",
   TANIMSIZ: "Tanımlı değil",
 }
+
+/** e-Tebligat girişinin şifre kasasındaki karşılığı: İnteraktif VD (TCKN/VKN + şifre) */
+export const TEBLIGAT_KASA_SISTEMI = "IVD" as const

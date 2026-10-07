@@ -8,6 +8,8 @@ import {
 import { aktiviteKeys } from "@/features/aktivite/queries"
 import { fisAktarimiKeys } from "@/features/fis-aktarimi/queries"
 import { arsivKeys } from "@/features/arsiv/queries"
+import { bordroKeys } from "@/features/bordro/queries"
+import { gorevKeys } from "@/features/gorev/queries"
 import { ayarlarKeys } from "@/features/ayarlar/queries"
 import { evrakTalebiApi } from "@/features/evrak-talebi/api"
 import type {
@@ -70,6 +72,9 @@ function useInvalidate(arsiv = false) {
       queryClient.invalidateQueries({ queryKey: evrakTalebiKeys.all }),
       queryClient.invalidateQueries({ queryKey: aktiviteKeys.all }),
       arsiv && queryClient.invalidateQueries({ queryKey: arsivKeys.all }),
+      // Onaylanan puantaj bordro dönemini "Girdi geldi" yapar, görev maddesini işaretler
+      arsiv && queryClient.invalidateQueries({ queryKey: bordroKeys.all }),
+      arsiv && queryClient.invalidateQueries({ queryKey: gorevKeys.all }),
       // Fiş / ekstre onayı okuma başlatır
       arsiv && queryClient.invalidateQueries({ queryKey: fisAktarimiKeys.all }),
     ])

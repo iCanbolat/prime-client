@@ -241,6 +241,7 @@ export function ArsivPage() {
               gosterMukellef={!mukellef}
               onYukle={yukle}
               onSayfa={(sayfa) => update({ sayfa })}
+              onDonemKaldir={() => update({ donem: null })}
             />
           </section>
         </div>

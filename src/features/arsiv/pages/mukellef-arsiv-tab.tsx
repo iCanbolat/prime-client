@@ -129,6 +129,7 @@ export function MukellefArsivTab() {
           setYukleHedef({ mukellefId: mukellef.id, kategori: params.kategori })
         }
         onSayfa={(sayfa) => update({ sayfa })}
+        onDonemKaldir={() => update({ donem: null })}
       />
 
       <YukleDialog hedef={yukleHedef} onClose={() => setYukleHedef(null)} />

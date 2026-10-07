@@ -10,6 +10,13 @@ import {
   gecerlilikDurumu,
   kalanGun,
 } from "@/features/arsiv/kurallar"
+import {
+  BORDRO_BELGE_SIRASI,
+  BORDRO_DONEM_RE,
+  DONEMLI_KATEGORILER,
+} from "@/features/bordro/kurallar"
+import { BORDRO_BELGE_ETIKET } from "@/features/bordro/sabitler"
+import { formatDonem } from "@/lib/format"
 import { bugun } from "@/lib/tarih"
 import { delBlob, getBlob, putBlob } from "@/mocks/blob-store"
 import { db } from "@/mocks/db"
@@ -17,6 +24,7 @@ import {
   api,
   errorResponse,
   logActivity,
+  logDosyaErisimi,
   notFound,
   requireActor,
   turkishIncludes,
@@ -35,9 +43,27 @@ import {
   ARSIV_KATEGORI_ETIKET,
   type ArsivDosya,
   type ArsivKategori,
+  type BordroBelgeTur,
 } from "@/types/domain"
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Arşiv kaydının dönem / bordro belge alanlarını doğrular */
+function donemAlanlariHatasi(
+  donem: unknown,
+  bordroBelge: unknown
+): string | undefined {
+  if (
+    donem !== undefined &&
+    (typeof donem !== "string" || !BORDRO_DONEM_RE.test(donem))
+  )
+    return "Geçersiz dönem"
+  if (
+    bordroBelge !== undefined &&
+    !BORDRO_BELGE_SIRASI.includes(bordroBelge as BordroBelgeTur)
+  )
+    return "Geçersiz belge türü"
+}
 const SIRALAMALAR: ArsivSiralama[] = [
   "ad",
   "yuklemeTarihi",
@@ -148,6 +174,7 @@ export const arsivHandlers = [
     const cop = p.get("cop") === "true"
     const sorumlu = p.get("sorumlu")
     const gecerlilik = p.get("gecerlilik")
+    const donem = p.get("donem")
     const bugunYmd = bugun()
     const siralaParam = p.get("sirala") as ArsivSiralama | null
     const sirala =
@@ -164,6 +191,7 @@ export const arsivHandlers = [
           d.silindi === cop &&
           ids.has(d.mukellefId) &&
           (!kategori || d.kategori === kategori) &&
+          (!donem || d.donem === donem) &&
           (!gecerlilik ||
             (d.gecerlilikTarihi !== undefined &&
               gecerlilikDurumu(d.gecerlilikTarihi, bugunYmd) === gecerlilik))
@@ -201,12 +229,23 @@ export const arsivHandlers = [
     })
   }),
 
-  http.get<{ id: string }>(api("/arsiv/:id/icerik"), async ({ params }) => {
-    const dosya = db.arsiv.find(params.id)
-    if (!dosya) return notFound("Dosya bulunamadı")
-    const dataUrl = (await getBlob(dosya.id)) ?? placeholderIcerik(dosya)
-    return HttpResponse.json({ dataUrl })
-  }),
+  http.get<{ id: string }>(
+    api("/arsiv/:id/icerik"),
+    async ({ params, request }) => {
+      const actor = requireActor(request)
+      if (actor instanceof Response) return actor
+      const dosya = db.arsiv.find(params.id)
+      if (!dosya) return notFound("Dosya bulunamadı")
+      logDosyaErisimi(request, actor, {
+        hedefTip: "ARSIV",
+        hedefId: dosya.id,
+        mukellefId: dosya.mukellefId,
+        ad: dosya.ad,
+      })
+      const dataUrl = (await getBlob(dosya.id)) ?? placeholderIcerik(dosya)
+      return HttpResponse.json({ dataUrl })
+    }
+  ),
 
   http.post<never, ArsivYukleRequest>(api("/arsiv"), async ({ request }) => {
     const actor = requireActor(request)
@@ -234,6 +273,9 @@ export const arsivHandlers = [
       return errorResponse(400, "Dosya 10 MB sınırını aşıyor.")
     if (body.gecerlilikTarihi && !YMD_RE.test(body.gecerlilikTarihi))
       return errorResponse(400, "Geçersiz geçerlilik tarihi")
+    const donemHata = donemAlanlariHatasi(body.donem, body.bordroBelge)
+    if (donemHata) return errorResponse(400, donemHata)
+    const donemli = DONEMLI_KATEGORILER.includes(body.kategori)
 
     const dosya = db.arsiv.insert({
       mukellefId: mukellef.id,
@@ -246,6 +288,11 @@ export const arsivHandlers = [
       gecerlilikTarihi: GECERLILIK_GEREKEN.includes(body.kategori)
         ? body.gecerlilikTarihi || undefined
         : undefined,
+      ...(donemli &&
+        body.donem && {
+          donem: body.donem,
+          bordroBelge: body.bordroBelge,
+        }),
       silindi: false,
     })
     await putBlob(dosya.id, body.dataUrl)
@@ -303,6 +350,44 @@ export const arsivHandlers = [
       }
       if (!GECERLILIK_GEREKEN.includes(kategori))
         patch.gecerlilikTarihi = undefined
+
+      if (body.donem !== undefined || body.bordroBelge !== undefined) {
+        const donemHata = donemAlanlariHatasi(
+          body.donem ?? undefined,
+          body.bordroBelge ?? undefined
+        )
+        if (donemHata) return errorResponse(400, donemHata)
+        if (
+          body.donem !== undefined &&
+          (body.donem ?? undefined) !== dosya.donem
+        ) {
+          patch.donem = body.donem ?? undefined
+          degisiklikler.push(
+            body.donem
+              ? `dönemi ${formatDonem(body.donem)}`
+              : "dönemi kaldırıldı"
+          )
+        }
+        if (
+          body.bordroBelge !== undefined &&
+          (body.bordroBelge ?? undefined) !== dosya.bordroBelge
+        ) {
+          patch.bordroBelge = body.bordroBelge ?? undefined
+          degisiklikler.push(
+            body.bordroBelge
+              ? `belge türü ${BORDRO_BELGE_ETIKET[body.bordroBelge]}`
+              : "belge türü kaldırıldı"
+          )
+        }
+      }
+      // Dönem yalnızca bordro / SGK belgelerinde anlamlı; başka kategoriye taşınınca silinir
+      if (!DONEMLI_KATEGORILER.includes(kategori)) {
+        patch.donem = undefined
+        patch.bordroBelge = undefined
+      }
+      // Türsüz dönem olabilir (SGK belgesi), dönemsiz tür olamaz
+      if (!("donem" in patch ? patch.donem : dosya.donem))
+        patch.bordroBelge = undefined
 
       const guncel = db.arsiv.update(dosya.id, patch)!
       if (degisiklikler.length) {

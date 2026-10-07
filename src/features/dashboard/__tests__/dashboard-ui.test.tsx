@@ -140,6 +140,19 @@ describe("Gösterge paneli", () => {
     expect(tehlike).toBeLessThan(uyari)
   })
 
+  it("bordro uyarıları: girdisi gelmeyen dönemler dikkat kartında sayılır ve bordro sayfasına gider", async () => {
+    renderRoute("/", { as: TEST_USERS.yonetici })
+    // m_ltd + m_as × (Ağustos yaklaşıyor, Temmuz gecikti): hepsi girdi bekliyor
+    await waitFor(() =>
+      expect(
+        within(dikkatSatiri("Bordro girdisi gelmedi")).getByText("4")
+      ).toBeInTheDocument()
+    )
+    expect(
+      within(dikkatSatiri("Bordro girdisi gelmedi")).getByRole("link")
+    ).toHaveAttribute("href", "/bordro?durum=BEKLENIYOR")
+  })
+
   it("'Benim mükelleflerim' yalnızca kullanıcının mükelleflerini sayar", async () => {
     const { router, user } = renderRoute("/", { as: TEST_USERS.personel }) // Mehmet: m_sahis, m_as
     await screen.findByText("Eksik zorunlu evrak")

@@ -1,5 +1,12 @@
 /** API istek/yanıt sözleşmeleri. MSW handler'ları ve feature api katmanı ortak kullanır. */
 import type {
+  BordroBelgeTur,
+  BordroDurum,
+  BordroOzeti,
+  BordroSaklananDurum,
+  IsHareketi,
+  IsHareketiTur,
+  MizanKontrol,
   Gorev,
   GorevDurum,
   GorevOncelik,
@@ -63,6 +70,7 @@ import type {
   LucaSablonAyari,
   MuhasebeFisi,
 } from "@/types/domain"
+import type { BordroUyari } from "@/features/bordro/kurallar"
 import type { TebligatSureDurumu } from "@/features/tebligat/kurallar"
 import type {
   AylikTahsilat,
@@ -141,8 +149,13 @@ export interface TopluAtamaRequest {
 export interface AktiviteListParams {
   mukellefId?: string
   hedefId?: string
+  /** Yalnızca bu eylemler (ör. dosya erişim kayıtları) */
+  eylem?: AktiviteEylem[]
   limit?: number
 }
+
+/** Dosya içerik uçlarında `?islem=`: görüntüleme mi indirme mi (erişim kaydı için) */
+export type DosyaErisimIslemi = "onizle" | "indir"
 
 export type AktiviteKaydi = AktiviteLog & {
   aktor: Pick<Personel, "id" | "ad" | "soyad" | "renk"> | null
@@ -269,6 +282,8 @@ export interface ArsivListParams {
   sorumlu?: string
   /** Yalnızca süresi dolmuş / 30 gün içinde dolacak belgeler */
   gecerlilik?: Exclude<GecerlilikDurumu, "GECERLI">
+  /** "2026-08": yalnızca bu döneme ait belgeler (bordro sayfasındaki "Arşivde aç") */
+  donem?: string
   /** 1 tabanlı. Verilmezse tüm kayıtlar döner (mükellef kartındaki kategori sayıları). */
   sayfa?: number
   sayfaBoyutu?: number
@@ -311,6 +326,9 @@ export interface ArsivYukleRequest {
   mimeType: string
   boyut: number
   gecerlilikTarihi?: string
+  /** Yalnızca BORDRO / SGK_BELGESI kategorisinde saklanır */
+  donem?: string
+  bordroBelge?: BordroBelgeTur
   /** base64 data URL */
   dataUrl: string
 }
@@ -320,6 +338,9 @@ export interface ArsivGuncelleRequest {
   kategori?: ArsivKategori
   /** null: kaldır */
   gecerlilikTarihi?: string | null
+  /** null: kaldır. Dönem dışı kategoriye taşınınca ikisi de silinir. */
+  donem?: string | null
+  bordroBelge?: BordroBelgeTur | null
 }
 
 export interface ArsivIcerikResponse {
@@ -433,6 +454,8 @@ export interface PortalResponse {
   aciklama?: string
   sonKullanma: string
   yuklemeler: PortalYukleme[]
+  /** Puantaj için "Bu ay değişiklik yok" seçeneği gösterilir (dönemli, bordrolu mükellef) */
+  degisiklikYokSecilebilir: boolean
 }
 
 export interface PortalYukleRequest {
@@ -445,6 +468,11 @@ export interface PortalYukleRequest {
 
 export interface PortalTamamlaRequest {
   not?: string
+  /**
+   * Puantaj istenen dönemli talepte "Bu ay değişiklik yok": dosya yüklemeden tamamlanabilir,
+   * bordro dönemi "Girdi geldi" olur.
+   */
+  degisiklikYok?: boolean
 }
 
 // ——— Görevler (Faz 5) ———
@@ -1008,6 +1036,10 @@ export interface TebligatErisimSatiri {
   sorumluPersonelId: string
   durum: TebligatErisimSatirDurumu
   erisim: TebligatErisim | null
+  /** Mükellefin kasadaki İnteraktif VD kaydı (varsa) — "kasadan al" için */
+  kasaKaydiId?: string
+  /** Erişim kasadan aktarıldıktan sonra kasadaki kayıt güncellendi */
+  kasaDahaYeni: boolean
 }
 
 export interface TebligatErisimListParams {
@@ -1019,6 +1051,11 @@ export interface TebligatErisimKaydetRequest {
   kullaniciKodu: string
   /** Yalnızca bu istekte backend'e gider; yanıtta ve depoda son 4 karakteri kalır */
   sifre: string
+  /**
+   * Şifre tarayıcıda kasadaki bu kayıttan çözülüp gönderildiyse; kaynak olarak saklanır ve
+   * kayıt erişim geçmişine yazılır
+   */
+  kasaCredentialId?: string
 }
 
 export interface TebligatMukellefTaraResponse {
@@ -1244,4 +1281,154 @@ export interface AcilisTopluRequest {
   /** Tanımlı ücret varsa değiştirilir; açılış bakiyesi her mükellef için bir kez yazılır */
   uzerineYaz: boolean
   kayitlar: AcilisKaydi[]
+}
+
+// --- Bordro takibi ---------------------------------------------------------------
+
+export interface BordroListParams {
+  /** "2026-08"; yoksa içinde bulunulan ayın bordro dönemi (geçen ay) */
+  donem?: string
+  durum?: BordroDurum
+  uyari?: Exclude<BordroUyari, "YOK">
+  sorumlu?: string | null
+  q?: string
+  /** 1 tabanlı. Verilmezse ilk sayfa. */
+  sayfa?: number
+  sayfaBoyutu?: number
+}
+
+/** Mükellef × dönem satırı. Kayıt yoksa durum "BEKLENIYOR" olarak üretilir. */
+export interface BordroSatiri {
+  mukellefId: string
+  mukellefUnvan: string
+  sorumluPersonelId: string
+  donem: string
+  durum: BordroDurum
+  /** MUHSGK son günü (tatilde kaydırılmış) */
+  sonTarih: string
+  /** Bugünden son güne iş günü; geçtiyse negatif */
+  kalanIsGunu: number
+  uyari: BordroUyari
+  /** Mükellef kartındaki çalışan sayısı */
+  calisanSayisi: number
+  ozet?: BordroOzeti
+  girdiTalepId?: string
+  girdiTalepDurum?: TalepDurumu
+  /** Girdi dosyasız geldi: mükellef "bu ay değişiklik yok" dedi */
+  degisiklikYok?: boolean
+  not?: string
+  guncellemeTarihi?: string
+}
+
+export interface BordroListResponse {
+  donem: string
+  /** Yalnızca istenen sayfa */
+  items: BordroSatiri[]
+  /** Filtrelenmiş toplam satır */
+  total: number
+  sayfa: number
+  sayfaBoyutu: number
+  /** Durum/uyarı filtrelerinden önce (arama ve sorumlu uygulanmış), durum başına satır sayısı */
+  sayilar: Record<BordroDurum, number>
+  /** Aynı kapsamda süresi geçen / yaklaşan satır sayısı (sayfa uyarısı için) */
+  uyarilar: Record<Exclude<BordroUyari, "YOK">, number>
+}
+
+export interface BordroGuncelleRequest {
+  durum?: BordroSaklananDurum
+  not?: string
+  /**
+   * true: mükellef bu ay değişiklik olmadığını bildirdi; dönem "Girdi geldi"ye ilerler.
+   * false: işaret kaldırılır (durum değişmez).
+   */
+  degisiklikYok?: boolean
+}
+
+/** Dönemin arşivdeki belgesi (arşivde `donem` + `bordroBelge` ile bulunur) */
+export interface BordroBelgesi {
+  id: string
+  ad: string
+  mimeType: string
+  boyut: number
+  tur: BordroBelgeTur
+  yuklemeTarihi: string
+}
+
+export interface BordroBelgeYukleme {
+  dosya: IceAktarDosya
+  tur: BordroBelgeTur
+}
+
+export interface BordroBelgeEkleRequest {
+  dosyalar: BordroBelgeYukleme[]
+}
+
+export interface BordroTahakkukOzeti {
+  tahakkukNo?: string
+  odenecek?: number
+  vade?: string
+}
+
+export interface BordroDetay {
+  satir: BordroSatiri
+  /** Okuma anında hesaplanır; sonradan yüklenen tahakkuk / mizanı da yansıtır */
+  kontroller: MizanKontrol[]
+  tahakkuk?: BordroTahakkukOzeti
+  mizanVar: boolean
+  /** Dönemin arşivdeki belgeleri, tür sırasıyla */
+  belgeler: BordroBelgesi[]
+}
+
+export interface BordroOzetiKaydetRequest {
+  ozet: BordroOzeti
+  /**
+   * Arşive BORDRO kategorisi + dönemle yazılacak dosyalar. Özet ICMAL olandan okunmuştur; diğerleri
+   * (pusula, tahakkuk) okunmadan saklanır.
+   */
+  dosyalar?: BordroBelgeYukleme[]
+}
+
+export interface BordroOkuRequest {
+  dosya: IceAktarDosya
+}
+
+export interface BordroOkuResponse {
+  ozet: BordroOzeti
+  /** 0–1; düşükse personel alanları gözden geçirmeli */
+  guven: number
+}
+
+/** Dashboard "dikkat" kartı ve bildirimler için sayaçlar */
+export interface BordroOzetResponse {
+  /** Girdisi gelmemiş ve süresi yaklaşan / geçen (son iki dönem) */
+  girdiBekleyen: number
+  /** Girdi geldi ama MUHSGK süresi geçti */
+  geciken: number
+  hareketYaklasan: number
+  hareketGeciken: number
+}
+
+export interface IsHareketiListParams {
+  mukellefId?: string
+  durum?: "BEKLIYOR" | "BILDIRILDI"
+}
+
+export type IsHareketiView = IsHareketi & {
+  mukellefUnvan: string
+  /** Bildirim son günü (tatilde kaydırılmış) */
+  sonTarih: string
+  kalanIsGunu: number
+  uyari: BordroUyari
+}
+
+export interface IsHareketiEkleRequest {
+  mukellefId: string
+  tur: IsHareketiTur
+  tarih: string
+  kisi: string
+}
+
+export interface IsHareketiGuncelleRequest {
+  durum?: "BEKLIYOR" | "BILDIRILDI"
+  belgeArsivId?: string | null
 }

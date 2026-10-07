@@ -45,7 +45,12 @@ export async function kasaKilidiniAc(page: Page) {
   await expect(dialog).toBeHidden()
 }
 
-/** Seed'deki aktif (süresi dolmamış) bir evrak talebinin portal token'ı. */
+/**
+ * Aktif bir evrak talebinin portal token'ı. Seed son kullanma tarihleri sabit
+ * referans tarihine (SEED_REF_DATE) göre üretildiği için gerçek tarih ilerleyince
+ * süresi dolar; bu yüzden AKTIF bir talebin `sonKullanma`'sı localStorage'daki
+ * mock DB'de ileri alınır (seed'in kendisi değişmez, yalnız tarayıcı kopyası).
+ */
 export async function aktifPortalTokeni(page: Page): Promise<string> {
   await page.goto("/login")
   // Mock DB ilk API isteğinde oluşur; giriş listesi gelince hazırdır
@@ -57,11 +62,18 @@ export async function aktifPortalTokeni(page: Page): Promise<string> {
       k.startsWith("prime-ofis:db:")
     )!
     const db = JSON.parse(localStorage.getItem(key)!)
-    return db.talep.find(
-      (t: { durum: string; sonKullanma: string }) =>
-        t.durum === "AKTIF" && t.sonKullanma > new Date().toISOString()
-    )?.token as string | undefined
+    const talep = db.talep.find((t: { durum: string }) => t.durum === "AKTIF")
+    if (!talep) return undefined
+    if (talep.sonKullanma <= new Date().toISOString()) {
+      talep.sonKullanma = new Date(
+        Date.now() + 30 * 24 * 60 * 60 * 1000
+      ).toISOString()
+      localStorage.setItem(key, JSON.stringify(db))
+    }
+    return talep.token as string
   })
   expect(token).toBeTruthy()
+  // Bellekteki mock DB kopyası eskimesin; sonraki sayfa yüklemesi yamalı hâli okur
+  await page.reload()
   return token!
 }

@@ -7,11 +7,14 @@ import { Button } from "@/components/ui/button"
 import {
   Card,
   CardAction,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useCredentials } from "@/features/kasa/queries"
 import { ErisimDialog } from "@/features/tebligat/components/erisim-dialog"
+import { useKasadanAktar } from "@/features/tebligat/kasa-aktarim"
 import { ErisimDurumBadge } from "@/features/tebligat/components/tebligat-rozetleri"
 import {
   useTebligatErisim,
@@ -19,6 +22,35 @@ import {
   useTebligatMukellefTara,
 } from "@/features/tebligat/queries"
 import { formatDateTime } from "@/lib/format"
+
+/** Kasadaki İnteraktif VD şifresi taramanın kullandığından yeniyse uyarı + tek tıkla güncelleme */
+function KasaDahaYeni({
+  mukellefId,
+  credentialId,
+}: {
+  mukellefId: string
+  credentialId: string
+}) {
+  const credentials = useCredentials({ mukellefId })
+  const { aktar, isPending } = useKasadanAktar()
+  const kayit = credentials.data?.find((c) => c.id === credentialId)
+  return (
+    <CardContent className="flex flex-wrap items-center justify-between gap-2 text-sm">
+      <span className="text-amber-800 dark:text-amber-300">
+        Şifre kasasındaki İnteraktif VD şifresi, taramanın kullandığından daha
+        yeni.
+      </span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!kayit || isPending}
+        onClick={() => kayit && aktar(kayit)}
+      >
+        Kasadan güncelle
+      </Button>
+    </CardContent>
+  )
+}
 
 /** Mükellef kartında GİB e-Tebligat erişimi: durum, son tarama, tanımla / güncelle / şimdi tara */
 export function ErisimKarti({ mukellefId }: { mukellefId: string }) {
@@ -54,6 +86,7 @@ export function ErisimKarti({ mukellefId }: { mukellefId: string }) {
           {e && (
             <span className="block text-muted-foreground">
               Kullanıcı {e.kullaniciKodu} · şifre ••••{e.sifreIpucu}
+              {e.kasaKaynagi && " (kasadan)"}
               {e.sonTarama &&
                 ` · son başarılı tarama ${formatDateTime(e.sonTarama)}`}
             </span>
@@ -103,6 +136,9 @@ export function ErisimKarti({ mukellefId }: { mukellefId: string }) {
           )}
         </CardAction>
       </CardHeader>
+      {s.kasaDahaYeni && s.kasaKaydiId && (
+        <KasaDahaYeni mukellefId={mukellefId} credentialId={s.kasaKaydiId} />
+      )}
       <ErisimDialog
         satir={duzenle ? s : null}
         onClose={() => setDuzenle(false)}

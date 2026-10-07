@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { db } from "@/mocks/db"
+import { fixtureSifresi, kasayiAc } from "@/test/kasa"
 import { TEST_USERS, renderRoute } from "@/test/render"
 
 beforeEach(() => {
@@ -107,5 +108,84 @@ describe("e-Tebligat", () => {
     const tablo = await screen.findByRole("table", { name: "e-Tebligatlar" })
     expect(within(tablo).getAllByRole("row")).toHaveLength(2)
     expect(within(tablo).getByText("İzaha davet")).toBeInTheDocument()
+  })
+
+  it("kasadaki İnteraktif VD şifresi erişim formundan aktarılır ve kasa erişim geçmişine yazılır", async () => {
+    await kasayiAc()
+    const { user } = renderRoute("/mukellefler/m_sahis/tebligat", {
+      as: TEST_USERS.personel,
+    })
+    await user.click(
+      await screen.findByRole("button", { name: "Erişim tanımla" })
+    )
+    const form = await screen.findByRole("dialog", {
+      name: "GİB e-Tebligat erişimi",
+    })
+    await user.click(
+      await within(form).findByRole("button", {
+        name: "Kasadaki şifreyi kullan",
+      })
+    )
+    const kasa = db.credential.where(
+      (c) => c.mukellefId === "m_sahis" && c.sistem === "IVD"
+    )[0]!
+    await waitFor(() =>
+      expect(
+        db.tebligatErisim.where((e) => e.mukellefId === "m_sahis")[0]
+      ).toMatchObject({
+        durum: "AKTIF",
+        kullaniciKodu: kasa.kullaniciAdi,
+        sifreIpucu: fixtureSifresi("m_sahis", "IVD").sifre.slice(-4),
+        kasaKaynagi: { credentialId: kasa.id },
+      })
+    )
+    expect(
+      db.aktivite.where(
+        (a) => a.eylem === "SIFRE_TEBLIGATA_AKTARILDI" && a.hedefId === kasa.id
+      )
+    ).toHaveLength(1)
+    expect(await screen.findByText(/\(kasadan\)/)).toBeInTheDocument()
+  })
+
+  it("kasada İnteraktif VD şifresi değişince e-Tebligat taraması da güncellenebilir", async () => {
+    await kasayiAc()
+    const { user } = renderRoute("/mukellefler/m_ltd/sifreler", {
+      as: TEST_USERS.personel,
+    })
+    const ivd = await screen.findByRole("region", {
+      name: "İnteraktif VD şifresi",
+    })
+    expect(
+      await within(ivd).findByText(/ayrı girilmiş bir şifre kullanıyor/)
+    ).toBeInTheDocument()
+    await user.click(
+      within(ivd).getByRole("button", {
+        name: "İnteraktif VD şifresini düzenle",
+      })
+    )
+    const dialog = await screen.findByRole("dialog", {
+      name: "İnteraktif VD şifresi düzenle",
+    })
+    const sifre = within(dialog).getByLabelText("Şifre")
+    await user.clear(sifre)
+    await user.type(sifre, "YeniIvd#77")
+    await user.click(within(dialog).getByRole("button", { name: "Kaydet" }))
+
+    const soru = await screen.findByRole("dialog", {
+      name: "e-Tebligat taraması da bu şifreyi kullansın mı?",
+    })
+    expect(soru).toHaveTextContent("••••abcd")
+    await user.click(
+      within(soru).getByRole("button", { name: "Evet, güncelle" })
+    )
+    await waitFor(() =>
+      expect(db.tebligatErisim.find("te_ltd")).toMatchObject({
+        sifreIpucu: "d#77",
+        kasaKaynagi: { credentialId: expect.any(String) },
+      })
+    )
+    expect(
+      await within(ivd).findByText("e-Tebligat taraması bu şifreyi kullanıyor.")
+    ).toBeInTheDocument()
   })
 })

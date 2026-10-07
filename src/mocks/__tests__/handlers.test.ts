@@ -129,8 +129,12 @@ describe("dev", () => {
       fis: 3,
       fisHesapAyari: 0,
       lucaAktarim: 0,
+      bordro: 0,
+      isHareketi: 0,
     })
     await http.post("/dev/reset")
-    expect(await http.get("/dev/stats")).toMatchObject({ mukellef: 40 })
+    const seed = await http.get<Record<string, number>>("/dev/stats")
+    expect(seed.mukellef).toBe(40)
+    expect(seed.bordro).toBeGreaterThan(0)
   })
 })

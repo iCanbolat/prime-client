@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { AktiviteListesi } from "@/features/aktivite/components/aktivite-listesi"
 import { usePersonelList } from "@/features/auth/queries"
 import { useAuthStore } from "@/features/auth/store"
+import { TalepOlusturDialog } from "@/features/evrak-talebi/components/talep-olustur-dialog"
 import { TalepDurumBadge } from "@/features/evrak-talebi/components/talep-rozetleri"
 import { useTalepList } from "@/features/evrak-talebi/queries"
 import { ISTENEN_EVRAKLAR } from "@/features/evrak-talebi/sabitler"
@@ -367,6 +368,7 @@ function BagliTalepler({
   onKaydet: (ids: string[]) => void
 }) {
   const talepler = useTalepList({ mukellefId: gorev.mukellefId })
+  const [puantajTalebi, setPuantajTalebi] = useState(false)
   const eklenebilir = (talepler.data ?? []).filter(
     (t) => !gorev.bagliTalepIdler.includes(t.id)
   )
@@ -418,6 +420,31 @@ function BagliTalepler({
         <p className="text-sm text-muted-foreground">
           Bu göreve bağlı evrak talebi yok.
         </p>
+      )}
+      {gorev.tip === "MUHTASAR_SGK" && (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            onClick={() => setPuantajTalebi(true)}
+          >
+            Puantaj iste
+          </Button>
+          <TalepOlusturDialog
+            hedef={
+              puantajTalebi
+                ? {
+                    mukellefId: gorev.mukellefId,
+                    istenenler: ["PUANTAJ"],
+                    donem: gorev.donem,
+                  }
+                : null
+            }
+            onClose={() => setPuantajTalebi(false)}
+            onOlustu={(talep) => onKaydet([...gorev.bagliTalepIdler, talep.id])}
+          />
+        </>
       )}
       {eklenebilir.length > 0 && (
         <Select

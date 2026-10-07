@@ -967,5 +967,7 @@ export function createFixtureState(): DbState {
     fis: structuredClone(FIXTURE_FISLER),
     fisHesapAyari: [],
     lucaAktarim: [],
+    bordro: [],
+    isHareketi: [],
   }
 }

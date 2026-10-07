@@ -1,5 +1,6 @@
 import { http } from "@/lib/http"
 import type {
+  DosyaErisimIslemi,
   BaglantiKaydetRequest,
   BeratListParams,
   BeratListResponse,
@@ -36,8 +37,10 @@ export const eBelgeApi = {
       params: { ...params },
     }),
   fatura: (id: string) => http.get<EBelgeDetay>(`/e-belge/faturalar/${id}`),
-  icerik: (id: string) =>
-    http.get<EBelgeIcerikResponse>(`/e-belge/faturalar/${id}/icerik`),
+  icerik: (id: string, islem: DosyaErisimIslemi = "onizle") =>
+    http.get<EBelgeIcerikResponse>(`/e-belge/faturalar/${id}/icerik`, {
+      params: { islem },
+    }),
   yanit: (id: string, body: EFaturaYanitRequest) =>
     http.post<EBelgeView>(`/e-belge/faturalar/${id}/yanit`, body),
   arsiveKaydet: (id: string) =>

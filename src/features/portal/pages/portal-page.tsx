@@ -41,6 +41,7 @@ function YuklemeFormu({
   const [yerel, setYerel] = useState<YerelYukleme[]>([])
   const [not, setNot] = useState("")
   const [gonderiliyor, setGonderiliyor] = useState(false)
+  const [degisiklikYok, setDegisiklikYok] = useState(false)
   const [bitti, setBitti] = useState<number | null>(null)
 
   const yenile = () =>
@@ -103,14 +104,20 @@ function YuklemeFormu({
     (y) => y.durum === "BEKLIYOR"
   ).length
   const devamEden = yerel.some((y) => !y.hata)
-  const tamamlanan = portal.istenenler.filter((i) =>
-    portal.yuklemeler.some((y) => y.istenen === i && y.durum !== "REDDEDILDI")
+  const tamamlanan = portal.istenenler.filter(
+    (i) =>
+      (i === "PUANTAJ" && degisiklikYok) ||
+      portal.yuklemeler.some((y) => y.istenen === i && y.durum !== "REDDEDILDI")
   ).length
+  const gonderilebilir = bekleyen > 0 || degisiklikYok
 
   const tamamla = async () => {
     setGonderiliyor(true)
     try {
-      await portalApi.tamamla(token, { not: not.trim() || undefined })
+      await portalApi.tamamla(token, {
+        not: not.trim() || undefined,
+        ...(degisiklikYok && { degisiklikYok: true }),
+      })
       setBitti(bekleyen)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gönderilemedi")
@@ -201,6 +208,11 @@ function YuklemeFormu({
             onYerelKaldir={(key) =>
               setYerel((l) => l.filter((y) => y.key !== key))
             }
+            degisiklikYok={
+              i === "PUANTAJ" && portal.degisiklikYokSecilebilir
+                ? { secili: degisiklikYok, onChange: setDegisiklikYok }
+                : undefined
+            }
           />
         ))}
       </ul>
@@ -222,7 +234,7 @@ function YuklemeFormu({
           </Field>
           <Button
             size="lg"
-            disabled={bekleyen === 0 || devamEden || gonderiliyor}
+            disabled={!gonderilebilir || devamEden || gonderiliyor}
             onClick={() => void tamamla()}
           >
             {gonderiliyor && <Spinner data-icon="inline-start" />}
@@ -230,9 +242,11 @@ function YuklemeFormu({
               ? `Gönderimi tamamla (${bekleyen} dosya)`
               : "Gönderimi tamamla"}
           </Button>
-          {bekleyen === 0 && (
+          {!gonderilebilir && (
             <p className="text-center text-xs text-muted-foreground">
-              Göndermek için en az bir dosya yükleyin.
+              {portal.degisiklikYokSecilebilir
+                ? "Göndermek için en az bir dosya yükleyin veya puantajda “Bu ay değişiklik yok”u seçin."
+                : "Göndermek için en az bir dosya yükleyin."}
             </p>
           )}
         </CardContent>

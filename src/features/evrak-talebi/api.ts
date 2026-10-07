@@ -1,5 +1,6 @@
 import { http } from "@/lib/http"
 import type {
+  DosyaErisimIslemi,
   ArsivIcerikResponse,
   GelenEvrakView,
   GelenListParams,
@@ -31,8 +32,10 @@ export const evrakTalebiApi = {
   gelenList: (params: GelenListParams) =>
     http.get<GelenEvrakView[]>("/gelen-evrak", { params: { ...params } }),
   gelenSayac: () => http.get<GelenSayacResponse>("/gelen-evrak/sayac"),
-  gelenIcerik: (id: string) =>
-    http.get<ArsivIcerikResponse>(`/gelen-evrak/${id}/icerik`),
+  gelenIcerik: (id: string, islem: DosyaErisimIslemi = "onizle") =>
+    http.get<ArsivIcerikResponse>(`/gelen-evrak/${id}/icerik`, {
+      params: { islem },
+    }),
   onayla: (id: string, body: GelenOnaylaRequest) =>
     http.post<GelenEvrakView>(`/gelen-evrak/${id}/onayla`, body),
   reddet: (id: string, body: GelenReddetRequest) =>

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { toast } from "sonner"
 
-import { DatePicker } from "@/components/shared/date-picker"
+import { DatePicker, MonthPicker } from "@/components/shared/date-picker"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input"
 import { KategoriSelect } from "@/features/arsiv/components/kategori-select"
 import { GECERLILIK_GEREKEN } from "@/features/arsiv/kurallar"
 import { useArsivGuncelle } from "@/features/arsiv/queries"
+import { BordroBelgeSelect } from "@/features/bordro/components/bordro-belge-select"
+import { DONEMLI_KATEGORILER } from "@/features/bordro/kurallar"
 import type { ArsivDosyaView } from "@/types/api"
 
 function DuzenleForm({
@@ -35,8 +37,11 @@ function DuzenleForm({
   const [ad, setAd] = useState(dosya.ad)
   const [kategori, setKategori] = useState(dosya.kategori)
   const [gecerlilik, setGecerlilik] = useState(dosya.gecerlilikTarihi ?? "")
+  const [donem, setDonem] = useState(dosya.donem ?? "")
+  const [bordroBelge, setBordroBelge] = useState(dosya.bordroBelge ?? null)
   const [hata, setHata] = useState<string>()
   const sureli = GECERLILIK_GEREKEN.includes(kategori)
+  const donemli = DONEMLI_KATEGORILER.includes(kategori)
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -50,6 +55,10 @@ function DuzenleForm({
         ad,
         kategori,
         gecerlilikTarihi: sureli ? gecerlilik || null : undefined,
+        ...(donemli && {
+          donem: donem || null,
+          bordroBelge: donem ? bordroBelge : null,
+        }),
       },
       {
         onSuccess: () => {
@@ -102,6 +111,34 @@ function DuzenleForm({
             />
             <FieldDescription>30 gün kala uyarı verilir.</FieldDescription>
           </Field>
+        )}
+        {donemli && (
+          <>
+            <Field>
+              <FieldLabel htmlFor="arsiv-donem">Dönem</FieldLabel>
+              <MonthPicker
+                id="arsiv-donem"
+                value={donem}
+                onChange={setDonem}
+                placeholder="Dönemsiz"
+                clearable
+              />
+              <FieldDescription>
+                Dönem verilen belge, mükellefin o ayki bordrosunda listelenir.
+              </FieldDescription>
+            </Field>
+            {donem && (
+              <Field>
+                <FieldLabel htmlFor="arsiv-bordro-belge">Belge türü</FieldLabel>
+                <BordroBelgeSelect
+                  id="arsiv-bordro-belge"
+                  value={bordroBelge}
+                  onValueChange={setBordroBelge}
+                  bos="Belirtilmemiş"
+                />
+              </Field>
+            )}
+          </>
         )}
       </FieldGroup>
       <DialogFooter>

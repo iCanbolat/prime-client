@@ -13,6 +13,7 @@ import {
   MoneyReceive02Icon,
   Settings01Icon,
   UserGroupIcon,
+  UserMultiple02Icon,
 } from "@hugeicons/core-free-icons"
 
 import type { Rol } from "@/types/domain"
@@ -83,7 +84,15 @@ export const NAV_GROUPS: NavGroup[] = [
         title: "Fiş Aktarımı",
         to: "/fis-aktarimi",
         icon: Invoice01Icon,
-        keywords: ["luca", "fiş", "ekstre", "ocr", "muhasebe fişi", "excel", "mahsup"],
+        keywords: [
+          "luca",
+          "fiş",
+          "ekstre",
+          "ocr",
+          "muhasebe fişi",
+          "excel",
+          "mahsup",
+        ],
         sayac: "fisTaslak",
       },
       {
@@ -112,14 +121,43 @@ export const NAV_GROUPS: NavGroup[] = [
         title: "e-Tebligat",
         to: "/tebligat",
         icon: LegalDocument01Icon,
-        keywords: ["tebligat", "ödeme emri", "ihbarname", "izaha davet", "ivd", "gib"],
+        keywords: [
+          "tebligat",
+          "ödeme emri",
+          "ihbarname",
+          "izaha davet",
+          "ivd",
+          "gib",
+        ],
         sayac: "acikTebligat",
+      },
+      {
+        title: "Bordro takibi",
+        to: "/bordro",
+        icon: UserMultiple02Icon,
+        keywords: [
+          "bordro",
+          "puantaj",
+          "muhsgk",
+          "sgk",
+          "maaş",
+          "çalışan",
+          "işe giriş",
+        ],
       },
       {
         title: "Tahsilat",
         to: "/tahsilat",
         icon: MoneyReceive02Icon,
-        keywords: ["ücret", "cari", "ödeme", "alacak", "kesinti", "stopaj", "makbuz"],
+        keywords: [
+          "ücret",
+          "cari",
+          "ödeme",
+          "alacak",
+          "kesinti",
+          "stopaj",
+          "makbuz",
+        ],
       },
       {
         title: "İçe Aktarım",

@@ -42,6 +42,8 @@ import {
 } from "@/features/kasa/queries"
 import { SISTEMLER, SISTEM_SIRASI } from "@/features/kasa/sistemler"
 import { GOSTERME_SURESI_MS, useVaultStore } from "@/features/kasa/store"
+import { KasaTebligatSatiri } from "@/features/tebligat/components/kasa-tebligat-satiri"
+import { TEBLIGAT_KASA_SISTEMI } from "@/features/tebligat/sabitler"
 import { copyWithAutoClear, PANO_TEMIZLEME_MS } from "@/lib/clipboard"
 import { DecryptError, decryptJson } from "@/lib/crypto"
 import { formatDateTime } from "@/lib/format"
@@ -244,6 +246,9 @@ export function CredentialKarti({
         {tanim.ekSifreEtiketi && gizliSatir("ekSifre", tanim.ekSifreEtiketi)}
         {credential.not && (
           <p className="text-xs text-muted-foreground">Not: {credential.not}</p>
+        )}
+        {sistem === TEBLIGAT_KASA_SISTEMI && (
+          <KasaTebligatSatiri credential={credential} />
         )}
       </CardContent>
       <CardFooter className="mt-auto flex-col items-stretch gap-2">

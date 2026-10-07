@@ -1,6 +1,6 @@
 # Prime Ofis
 
-2-5 kişilik muhasebe büroları için mükellef, evrak ve görev takibi. e-Belge işlemleri TÜRMOB-Luca e-Entegratör üzerinden yürür; tahakkuk fişleri ve mizanlar dosya ile içe aktarılır. Büronun kendi tahsilatı (aylık ücret, SMMM kesinti kontrolü), e-Tebligat takibi (mükelleflerin GİB e-Tebligat kutuları her gece taranır, tebligatlar sabaha hazırdır) ve e-posta / Telegram / WhatsApp Business ile hatırlatma ve mükellefe gönderim de dahildir (SMS yoktur). Frontend şu an **mock API (MSW)** ile tamamen lokalde çalışır.
+2-5 kişilik muhasebe büroları için mükellef, evrak ve görev takibi. e-Belge işlemleri TÜRMOB-Luca e-Entegratör üzerinden yürür; tahakkuk fişleri ve mizanlar dosya ile içe aktarılır. Büronun kendi tahsilatı (aylık ücret, SMMM kesinti kontrolü), e-Tebligat takibi (mükelleflerin GİB e-Tebligat kutuları her gece taranır, tebligatlar sabaha hazırdır) ve e-posta / Telegram / WhatsApp Business ile hatırlatma ve mükellefe gönderim de dahildir (SMS yoktur). Bordro takibi (puantaj girdisinden MUHSGK beyanına dönem durumu, işe giriş / çıkış bildirim süreleri, bordro–tahakkuk–mizan çapraz kontrolü) bordro hesaplamaz; muhasebe paketindeki bordronun aşamasını ve toplamlarını izler. Arşiv, gelen evrak ve e-Belge dosyalarının her görüntüleme / indirmesi sunucu tarafında kaydedilir. Frontend şu an **mock API (MSW)** ile tamamen lokalde çalışır.
 
 Geliştirme planı ve faz durumu: [.claude/FRONTEND_PLAN.md](.claude/FRONTEND_PLAN.md)
 
@@ -21,7 +21,7 @@ pnpm build && pnpm preview   # production build, mock API dahil (http://localhos
 
 ## Mock veri
 
-- Veriler tarayıcıda `localStorage`'da tutulur (seed = 42, 40 mükellef, 4 personel).
+- Veriler tarayıcıda `localStorage`'da tutulur (seed = 42, 40 mükellef, 4 personel). Veri şeması değişince (`STORAGE_KEY`) eski yerel veri kullanılmaz ve seed'den yeniden oluşturulur.
 - **Şifre kasası demo ana şifresi: `demo1234`** (kasa ilk açıldığında örnek şifreli kayıtlar oluşturulur).
 - **Ayarlar → Geliştirici**: veritabanını sıfırlama, ağ gecikmesini açıp kapatma, belirli bir API yolu için 500 hatası simülasyonu.
 - Gerçek backend henüz olmadığı için production build'de de mock API açıktır (`.env.production` → `VITE_ENABLE_MOCKS=true`). Backend bağlanınca bu satırı kaldırın veya ortam değişkenini `false` yapın.

@@ -7,6 +7,8 @@ import {
 } from "@hugeicons/core-free-icons"
 
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Progress } from "@/components/ui/progress"
 import { DosyaIkonu } from "@/features/arsiv/components/dosya-gorsel"
 import { DOSYA_ACCEPT, formatBoyut } from "@/features/arsiv/kurallar"
@@ -72,6 +74,7 @@ export function IstenenSatiri({
   onDosyalar,
   onSil,
   onYerelKaldir,
+  degisiklikYok,
 }: {
   istenen: IstenenEvrak
   yuklemeler: PortalYukleme[]
@@ -79,9 +82,13 @@ export function IstenenSatiri({
   onDosyalar: (files: File[], istenen: IstenenEvrak) => void
   onSil: (id: string) => void
   onYerelKaldir: (key: string) => void
+  /** Yalnızca puantajda: dosya yerine "Bu ay değişiklik yok" bildirimi */
+  degisiklikYok?: { secili: boolean; onChange: (secili: boolean) => void }
 }) {
   const tanim = ISTENEN_EVRAKLAR[istenen]
-  const tamam = yuklemeler.some((y) => y.durum !== "REDDEDILDI")
+  const tamam =
+    yuklemeler.some((y) => y.durum !== "REDDEDILDI") ||
+    Boolean(degisiklikYok?.secili)
   const reddedilen = yuklemeler.some((y) => y.durum === "REDDEDILDI") && !tamam
 
   return (
@@ -175,6 +182,23 @@ export function IstenenSatiri({
             </li>
           ))}
         </ul>
+      )}
+
+      {degisiklikYok && (
+        <Field orientation="horizontal" className="rounded-xl bg-muted/50 p-3">
+          <Checkbox
+            id={`degisiklik-yok-${istenen}`}
+            checked={degisiklikYok.secili}
+            onCheckedChange={(v) => degisiklikYok.onChange(v === true)}
+          />
+          <FieldLabel
+            htmlFor={`degisiklik-yok-${istenen}`}
+            className="font-normal"
+          >
+            Bu ay değişiklik yok (izin, fazla mesai, avans, kesinti olmadı;
+            çalışanlar geçen ayla aynı)
+          </FieldLabel>
+        </Field>
       )}
 
       <div className="grid grid-cols-2 gap-2">

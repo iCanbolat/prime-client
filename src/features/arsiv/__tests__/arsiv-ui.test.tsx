@@ -62,6 +62,75 @@ describe("Arşiv gezgini", () => {
     )
   })
 
+  it("bordrodan dönemle açılır: dönem rozeti ve filtre; düzenlemede dönem ve belge türü değişir", async () => {
+    const ortak = {
+      mukellefId: "m_ltd",
+      kategori: "BORDRO" as const,
+      mimeType: "application/pdf",
+      boyut: 1000,
+      yukleyenId: "p_2",
+      yuklemeTarihi: "2026-09-10T10:00:00Z",
+      silindi: false,
+    }
+    db.arsiv.insert({
+      ...ortak,
+      id: "b_agu",
+      ad: "Pusula ağustos.pdf",
+      donem: "2026-08",
+      bordroBelge: "PUSULA",
+    })
+    db.arsiv.insert({
+      ...ortak,
+      id: "b_tem",
+      ad: "Pusula temmuz.pdf",
+      donem: "2026-07",
+    })
+    const { user, router } = renderRoute(
+      "/arsiv?mukellef=m_ltd&kategori=BORDRO&donem=2026-08&gorunum=liste",
+      { as: TEST_USERS.yonetici }
+    )
+
+    const satir = await screen.findByRole("row", { name: "Pusula ağustos.pdf" })
+    expect(satir).toHaveTextContent("Ağustos 2026 · Pusula")
+    expect(
+      screen.queryByRole("row", { name: "Pusula temmuz.pdf" })
+    ).not.toBeInTheDocument()
+
+    await user.click(
+      within(satir).getByRole("button", {
+        name: "Pusula ağustos.pdf işlemleri",
+      })
+    )
+    await user.click(await screen.findByRole("menuitem", { name: "Düzenle" }))
+    const dialog = await screen.findByRole("dialog", {
+      name: "Dosyayı düzenle",
+    })
+    expect(within(dialog).getByLabelText("Dönem")).toHaveTextContent(
+      "Ağustos 2026"
+    )
+    await user.click(
+      within(dialog).getByRole("combobox", { name: "Belge türü" })
+    )
+    await user.click(
+      await screen.findByRole("option", { name: "İmzalı bordro" })
+    )
+    await user.click(within(dialog).getByRole("button", { name: "Kaydet" }))
+    await waitFor(() =>
+      expect(db.arsiv.find("b_agu")).toMatchObject({
+        donem: "2026-08",
+        bordroBelge: "IMZALI",
+      })
+    )
+
+    await user.click(
+      screen.getByRole("button", { name: "Dönem filtresini kaldır" })
+    )
+    expect(
+      await screen.findByRole("row", { name: "Pusula temmuz.pdf" })
+    ).toBeInTheDocument()
+    expect(router.state.location.search).not.toContain("donem")
+  })
+
   it("sil → çöp kutusunda görünür → geri al → yerine döner", async () => {
     const { user } = renderRoute("/arsiv?mukellef=m_ltd&gorunum=liste", {
       as: TEST_USERS.yonetici,
@@ -120,6 +189,40 @@ describe("Arşiv gezgini", () => {
     )
     await waitFor(() => expect(db.arsiv.find("d_sahis_cop")).toBeUndefined())
     expect(await screen.findByText("Çöp kutusu boş")).toBeInTheDocument()
+  })
+})
+
+describe("Arşiv — dosya erişim kaydı", () => {
+  it("önizleme açılınca görüntüleme kaydedilir ve erişim geçmişinde görünür", async () => {
+    const { user } = renderRoute("/arsiv?gorunum=liste", {
+      as: TEST_USERS.yonetici,
+    })
+    await user.click(
+      (await screen.findAllByRole("button", { name: /işlemleri$/ }))[0]!
+    )
+    await user.click(await screen.findByRole("menuitem", { name: /Önizle/ }))
+    const dialog = await screen.findByRole("dialog")
+    await waitFor(() =>
+      expect(
+        db.aktivite.where((a) => a.eylem === "DOSYA_GORUNTULENDI")
+      ).toHaveLength(1)
+    )
+
+    const dosyaId = db.aktivite.where(
+      (a) => a.eylem === "DOSYA_GORUNTULENDI"
+    )[0]!.hedefId!
+    await user.click(
+      await within(dialog).findByRole("button", { name: "Erişim geçmişi" })
+    )
+    const gecmis = await within(dialog).findByRole("list", {
+      name: "Erişim geçmişi",
+    })
+    expect(within(gecmis).getByText(/Görüntüledi/)).toBeInTheDocument()
+    expect(
+      db.aktivite.where(
+        (a) => a.hedefId === dosyaId && a.eylem === "DOSYA_INDIRILDI"
+      )
+    ).toHaveLength(0)
   })
 })
 

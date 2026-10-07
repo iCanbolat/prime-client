@@ -36,7 +36,8 @@ import {
   ISTENEN_EVRAKLAR,
   ISTENEN_SIRASI,
   KANAL_ETIKET,
-  VARSAYILAN_GECERLILIK_GUN,
+  hassasMi,
+  varsayilanGecerlilik,
 } from "@/features/evrak-talebi/sabitler"
 import { useTalepOlustur } from "@/features/evrak-talebi/queries"
 import { MukellefSelect } from "@/features/mukellef/components/mukellef-select"
@@ -47,6 +48,8 @@ export interface TalepHedef {
   /** Verilirse mükellef sabittir (mükellef kartı) */
   mukellefId?: string
   istenenler?: IstenenEvrak[]
+  /** "2026-08"; verilirse dönem alanı bununla başlar */
+  donem?: string
 }
 
 const GECERLILIK_ITEMS = Object.fromEntries(
@@ -73,8 +76,12 @@ function TalepForm({
   const [istenenler, setIstenenler] = useState<IstenenEvrak[]>(
     hedef.istenenler ?? ["FIS_FATURA", "BANKA_EKSTRESI"]
   )
-  const [donem, setDonem] = useState(hedef.istenenler ? "" : oncekiAy())
-  const [gun, setGun] = useState(String(VARSAYILAN_GECERLILIK_GUN))
+  const [donem, setDonem] = useState(
+    hedef.donem ?? (hedef.istenenler ? "" : oncekiAy())
+  )
+  const [gun, setGun] = useState(String(varsayilanGecerlilik(istenenler)))
+  // Kullanıcı süreyi elle seçtiyse seçilen evraklar süreyi değiştirmez
+  const [gunElle, setGunElle] = useState(false)
   const [kanal, setKanal] = useState<TalepKanal>("WHATSAPP")
   const [aciklama, setAciklama] = useState("")
   const [hatalar, setHatalar] = useState<{
@@ -82,8 +89,11 @@ function TalepForm({
     istenen?: string
   }>({})
 
-  const toggle = (i: IstenenEvrak, secili: boolean) =>
-    setIstenenler((l) => (secili ? [...l, i] : l.filter((x) => x !== i)))
+  const toggle = (i: IstenenEvrak, secili: boolean) => {
+    const yeni = secili ? [...istenenler, i] : istenenler.filter((x) => x !== i)
+    setIstenenler(yeni)
+    if (!gunElle) setGun(String(varsayilanGecerlilik(yeni)))
+  }
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -176,7 +186,11 @@ function TalepForm({
             <Select
               items={GECERLILIK_ITEMS}
               value={gun}
-              onValueChange={(v) => v && setGun(String(v))}
+              onValueChange={(v) => {
+                if (!v) return
+                setGun(String(v))
+                setGunElle(true)
+              }}
             >
               <SelectTrigger id="talep-gecerlilik" className="w-full">
                 <SelectValue />
@@ -189,6 +203,11 @@ function TalepForm({
                 ))}
               </SelectContent>
             </Select>
+            {hassasMi(istenenler) && (
+              <FieldDescription>
+                Bordro / SGK evrakı: bağlantı kısa süreli tutulur.
+              </FieldDescription>
+            )}
           </Field>
         </div>
 
@@ -242,9 +261,12 @@ function TalepForm({
 export function TalepOlusturDialog({
   hedef,
   onClose,
+  onOlustu,
 }: {
   hedef: TalepHedef | null
   onClose: () => void
+  /** Talep oluşunca (gönderim adımından önce) çağrılır */
+  onOlustu?: (talep: TalepView) => void
 }) {
   const [olusan, setOlusan] = useState<TalepView | null>(null)
   const kapat = () => {
@@ -270,7 +292,14 @@ export function TalepOlusturDialog({
           </div>
         ) : (
           hedef && (
-            <TalepForm hedef={hedef} onOlustu={setOlusan} onClose={kapat} />
+            <TalepForm
+              hedef={hedef}
+              onOlustu={(talep) => {
+                setOlusan(talep)
+                onOlustu?.(talep)
+              }}
+              onClose={kapat}
+            />
           )
         )}
       </DialogContent>

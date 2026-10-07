@@ -33,7 +33,9 @@ function sonErisim(credentialId: string): SonErisim | null {
     .where(
       (a) =>
         a.hedefId === credentialId &&
-        (a.eylem === "SIFRE_GORUNTULENDI" || a.eylem === "SIFRE_KOPYALANDI")
+        (a.eylem === "SIFRE_GORUNTULENDI" ||
+          a.eylem === "SIFRE_KOPYALANDI" ||
+          a.eylem === "SIFRE_TEBLIGATA_AKTARILDI")
     )
     .sort((a, b) => b.zaman.localeCompare(a.zaman))[0]
   if (!last) return null

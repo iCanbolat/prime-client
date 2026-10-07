@@ -38,7 +38,7 @@ export function BildirimZili() {
         {okunmamis > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2 ring-background"
+            className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-none font-semibold text-white tabular-nums ring-2 dark:bg-red-700 ring-background"
           >
             {okunmamis > 9 ? "9+" : okunmamis}
           </span>

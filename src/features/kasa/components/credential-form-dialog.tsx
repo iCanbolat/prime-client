@@ -37,6 +37,9 @@ import {
   useCreateCredential,
   useUpdateCredential,
 } from "@/features/kasa/queries"
+import { useTebligatErisimKaydetKasadan } from "@/features/tebligat/kasa-aktarim"
+import { useTebligatErisim } from "@/features/tebligat/queries"
+import { TEBLIGAT_KASA_SISTEMI } from "@/features/tebligat/sabitler"
 import { encryptJson, generatePassword } from "@/lib/crypto"
 import { z } from "@/lib/zod"
 import type { CredentialKaydi } from "@/types/api"
@@ -116,6 +119,71 @@ function GizliAlan({
   )
 }
 
+/**
+ * İnteraktif VD kaydı kaydedildikten sonra: e-Tebligat gece taraması da bu şifreyi kullansın mı?
+ * Şifre zaten formda çözülmüş olduğundan kasa yeniden açılmaz; onay verilirse tek istekle sunucuya gider.
+ */
+function TebligatSorusu({
+  credential,
+  secret,
+  mevcutIpucu,
+  onClose,
+}: {
+  credential: CredentialKaydi
+  secret: CredentialSecret
+  mevcutIpucu?: string
+  onClose: () => void
+}) {
+  const { kaydet, isPending } = useTebligatErisimKaydetKasadan()
+  const onayla = async () => {
+    try {
+      await kaydet(credential, secret)
+      toast.success(
+        mevcutIpucu
+          ? "e-Tebligat taraması yeni şifreyle güncellendi"
+          : "e-Tebligat taraması bu geceden itibaren başlayacak"
+      )
+      onClose()
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "e-Tebligat erişimi kaydedilemedi"
+      )
+    }
+  }
+  return (
+    <div className="grid gap-4">
+      <DialogHeader>
+        <DialogTitle>
+          {mevcutIpucu
+            ? "e-Tebligat taraması da bu şifreyi kullansın mı?"
+            : "Bu şifreyle e-Tebligat taraması başlatılsın mı?"}
+        </DialogTitle>
+        <DialogDescription>
+          {mevcutIpucu
+            ? `Gece taraması şu an ••••${mevcutIpucu} ile GİB'e giriş yapıyor. `
+            : "Mükellefin GİB e-Tebligat kutusu her gece taranır, tebligatlar sabah hazır olur. "}
+          Onaylarsanız şifre bir kez sunucuya gönderilir ve kasadan ayrı, sunucu
+          anahtarıyla şifreli saklanır; kasa sıfır bilgili kalır.
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          Hayır
+        </Button>
+        <Button type="button" disabled={isPending} onClick={onayla}>
+          {isPending
+            ? "GİB'e giriş deneniyor…"
+            : mevcutIpucu
+              ? "Evet, güncelle"
+              : "Evet, başlat"}
+        </Button>
+      </DialogFooter>
+    </div>
+  )
+}
+
 function CredentialForm({
   hedef,
   cryptoKey,
@@ -128,6 +196,12 @@ function CredentialForm({
   const tanim = SISTEMLER[hedef.sistem]
   const create = useCreateCredential()
   const update = useUpdateCredential()
+  const tebligatKaynagi = hedef.sistem === TEBLIGAT_KASA_SISTEMI
+  const tebligat = useTebligatErisim(hedef.mukellefId, tebligatKaynagi)
+  const [soru, setSoru] = useState<{
+    credential: CredentialKaydi
+    secret: CredentialSecret
+  } | null>(null)
   const { register, handleSubmit, setValue, formState } =
     useForm<CredentialFormValues>({
       resolver: zodResolver(credentialSchema),
@@ -153,16 +227,28 @@ function CredentialForm({
       ...encrypted,
     }
     try {
+      let kayit: CredentialKaydi
       if (hedef.mevcut) {
-        await update.mutateAsync({ id: hedef.mevcut.credential.id, ...body })
+        kayit = await update.mutateAsync({
+          id: hedef.mevcut.credential.id,
+          ...body,
+        })
         toast.success(`${tanim.ad} şifresi güncellendi`)
       } else {
-        await create.mutateAsync({
+        kayit = await create.mutateAsync({
           mukellefId: hedef.mukellefId,
           sistem: hedef.sistem,
           ...body,
         })
         toast.success(`${tanim.ad} şifresi eklendi`)
+      }
+      const degisti =
+        !hedef.mevcut ||
+        hedef.mevcut.secret.sifre !== values.sifre ||
+        hedef.mevcut.credential.kullaniciAdi !== values.kullaniciAdi
+      if (tebligatKaynagi && degisti && tebligat.data) {
+        setSoru({ credential: kayit, secret })
+        return
       }
       onClose()
     } catch (error) {
@@ -172,6 +258,16 @@ function CredentialForm({
 
   const hata = (alan: keyof CredentialFormValues) =>
     formState.errors[alan]?.message
+
+  if (soru)
+    return (
+      <TebligatSorusu
+        credential={soru.credential}
+        secret={soru.secret}
+        mevcutIpucu={tebligat.data?.erisim?.sifreIpucu}
+        onClose={onClose}
+      />
+    )
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-4">

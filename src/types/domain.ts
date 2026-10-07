@@ -115,6 +115,7 @@ export type AktiviteEylem =
   | "SIFRE_EKLENDI"
   | "SIFRE_GORUNTULENDI"
   | "SIFRE_KOPYALANDI"
+  | "SIFRE_TEBLIGATA_AKTARILDI"
   | "SIFRE_GUNCELLENDI"
   | "SIFRE_SILINDI"
   | "BEYAN_DURUMU_GUNCELLENDI"
@@ -123,6 +124,11 @@ export type AktiviteEylem =
   | "ARSIV_SILINDI"
   | "ARSIV_GERI_ALINDI"
   | "ARSIV_KALICI_SILINDI"
+  | "DOSYA_GORUNTULENDI"
+  | "DOSYA_INDIRILDI"
+  | "BORDRO_GUNCELLENDI"
+  | "BORDRO_OZET_ICE_AKTARILDI"
+  | "ISE_HAREKETI_KAYDEDILDI"
   | "TALEP_OLUSTURULDU"
   | "TALEP_GONDERILDI"
   | "TALEP_UZATILDI"
@@ -187,6 +193,7 @@ export interface AktiviteLog {
     | "TAHSILAT"
     | "TEBLIGAT"
     | "FIS"
+    | "BORDRO"
   hedefId?: string
   /** Kaydın ilişkili olduğu mükellef (mükellef kartındaki aktivite akışı için) */
   mukellefId?: string
@@ -204,6 +211,8 @@ export type BildirimTur =
   | "BEYAN_YAKLASIYOR"
   | "ODEME_GECIKTI"
   | "TEBLIGAT_SURE_YAKLASIYOR"
+  | "BORDRO_GIRDI_BEKLIYOR"
+  | "ISE_HAREKETI_SURE"
 
 /** Uygulama içi bildirim. `aliciId: null` → tüm kullanıcılara yayın (aktörün kendisi hariç). */
 export interface Bildirim {
@@ -309,6 +318,8 @@ export type ArsivKategori =
   | "TAHAKKUK"
   | "MIZAN"
   | "TEBLIGAT"
+  | "BORDRO"
+  | "SGK_BELGESI"
   | "DIGER"
 
 /**
@@ -327,6 +338,10 @@ export interface ArsivDosya {
   yuklemeTarihi: ISODateString
   /** yyyy-MM-dd — imza sirküleri, faaliyet belgesi, kira sözleşmesi gibi süreli belgeler */
   gecerlilikTarihi?: string
+  /** "2026-08" — dönemli belgeler (bordro dökümü, puantaj, dekont…); bordro sayfası bununla bulur */
+  donem?: string
+  /** Bordro dönemine ait belgenin türü; yalnızca dönemli bordro belgelerinde */
+  bordroBelge?: BordroBelgeTur
   /** Çöp kutusunda mı */
   silindi: boolean
   silinmeTarihi?: ISODateString
@@ -347,7 +362,10 @@ export type IstenenEvrak =
   | "VERGI_LEVHASI"
   | "TICARET_SICIL_GAZETESI"
   | "FAALIYET_BELGESI"
-  | "SGK_BELGELERI"
+  | "PUANTAJ"
+  | "ISE_GIRIS_CIKIS"
+  | "IMZALI_BORDRO"
+  | "UCRET_DEKONTU"
   | "DIGER"
 
 export interface TalepGonderim {
@@ -552,6 +570,8 @@ export const ARSIV_KATEGORI_ETIKET: Record<ArsivKategori, string> = {
   TAHAKKUK: "Tahakkuk fişi",
   MIZAN: "Mizan",
   TEBLIGAT: "e-Tebligat",
+  BORDRO: "Bordro",
+  SGK_BELGESI: "SGK belgesi",
   DIGER: "Diğer",
 }
 
@@ -764,6 +784,11 @@ export interface TebligatErisim {
   hataMesaji?: string
   /** Son başarılı tarama */
   sonTarama?: ISODateString
+  /**
+   * Şifre kasadaki İnteraktif VD kaydından aktarıldıysa o kayıt ve aktarıldığı andaki
+   * güncellenme zamanı; kasadaki kayıt sonradan değişirse "kasadaki şifre daha yeni" uyarısı verilir.
+   */
+  kasaKaynagi?: { credentialId: string; credentialGuncelleme: ISODateString }
   tanimlayanId: string
   tanimlamaTarihi: ISODateString
 }
@@ -1023,4 +1048,82 @@ export interface LucaAktarim {
   olusturanId: string
   tarih: ISODateString
   geriAlindi?: boolean
+}
+
+// --- Bordro takibi -----------------------------------------------------------------
+
+/**
+ * Bir mükellefin bir ayki bordro aşaması. `BEYAN_VERILDI` saklanmaz: MUHSGK beyanı takvimde
+ * "Onaylandı" olunca türetilir.
+ */
+export type BordroDurum =
+  | "BEKLENIYOR"
+  | "GIRDI_GELDI"
+  | "HAZIRLANDI"
+  | "MUKELLEFE_GITTI"
+  | "BEYAN_VERILDI"
+
+/** Saklanabilen durumlar */
+export type BordroSaklananDurum = Exclude<BordroDurum, "BEYAN_VERILDI">
+
+/**
+ * Dönem bordrosunun toplamları (TL). Çalışan bazlı satırlar (ad, TCKN, maaş) ne okunur ne saklanır;
+ * yalnızca bu toplamlar tutulur.
+ */
+export interface BordroOzeti {
+  calisanSayisi: number
+  brutToplam: number
+  netToplam: number
+  sgkIsciPayi: number
+  sgkIsverenPayi: number
+  /** İşçi + işveren işsizlik sigortası primi */
+  issizlikToplam: number
+  gelirVergisi: number
+  damgaVergisi: number
+}
+
+/**
+ * Bir bordro dönemine ait arşiv belgesinin türü. Muhasebe paketinin (Luca…) çıktıları ICMAL,
+ * PUSULA, TAHAKKUK; mükelleften gelenler PUANTAJ, IMZALI, DEKONT.
+ */
+export type BordroBelgeTur =
+  "PUANTAJ" | "ICMAL" | "PUSULA" | "TAHAKKUK" | "IMZALI" | "DEKONT"
+
+/**
+ * Mükellef × ay bordro kaydı. Yalnızca işlem yapılınca oluşur (kayıt yoksa "Bekleniyor").
+ * id = `${mukellefId}:${donem}`; donem "2026-08" (iş ayı; MUHSGK ertesi ayın 26'sında).
+ */
+export interface BordroDonemi {
+  id: string
+  mukellefId: string
+  donem: string
+  durum: BordroSaklananDurum
+  /** Puantaj girdisinin geldiği evrak talebi */
+  girdiTalepId?: string
+  /** Mükellef bu ay puantajda değişiklik olmadığını bildirdi (dosyasız girdi) */
+  degisiklikYok?: boolean
+  ozet?: BordroOzeti
+  not?: string
+  guncelleyenId: string
+  guncellemeTarihi: ISODateString
+}
+
+export type IsHareketiTur = "GIRIS" | "CIKIS"
+export type IsHareketiDurum = "BEKLIYOR" | "BILDIRILDI"
+
+/** SGK işe giriş / işten çıkış bildirimi takibi. Kimlik numarası tutulmaz. */
+export interface IsHareketi {
+  id: string
+  mukellefId: string
+  tur: IsHareketiTur
+  /** yyyy-MM-dd: işe başlama veya işten ayrılma günü */
+  tarih: string
+  /** Ad soyad (serbest metin) */
+  kisi: string
+  durum: IsHareketiDurum
+  bildirimTarihi?: ISODateString
+  /** Bildirgenin arşivdeki kaydı */
+  belgeArsivId?: string
+  olusturanId: string
+  olusturmaTarihi: ISODateString
 }

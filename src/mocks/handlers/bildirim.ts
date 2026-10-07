@@ -3,13 +3,20 @@ import { addDays, getISOWeek, getISOWeekYear } from "date-fns"
 
 import { gecerlilikDurumu, kalanGun } from "@/features/arsiv/kurallar"
 import { YANIT_UYARI_GUN } from "@/features/e-belge/kurallar"
+import { HAREKET_TUR_ETIKET } from "@/features/bordro/hareket-kurallari"
+import { sonBordroDonemleri } from "@/features/bordro/kurallar"
 import { gecikmisMi } from "@/features/gorev/kurallar"
-import { formatTRY } from "@/lib/format"
+import { formatDonem, formatTRY } from "@/lib/format"
 import { bugun, fromYmd, toYmd } from "@/lib/tarih"
 import { bildirimGorunurMu } from "@/mocks/bildirim-kurallari"
 import { db } from "@/mocks/db"
 import { bildirimGonderimleri } from "@/mocks/gonderim"
 import { api, notFound, requireActor } from "@/mocks/handlers/common"
+import {
+  bordroMukellefleri,
+  bordroSatiri,
+  hareketView,
+} from "@/mocks/handlers/bordro-islemleri"
 import { ebelgeView } from "@/mocks/handlers/e-belge"
 import { cariDurum } from "@/features/tahsilat/kurallar"
 import { sureDurumu } from "@/features/tebligat/kurallar"
@@ -157,6 +164,49 @@ export function hatirlatmalariUret(bugunYmd: string = bugun()) {
       mukellefId: t.mukellefId,
       hedefTip: "TEBLIGAT",
       hedefId: t.id,
+    })
+  }
+
+  // Bordro girdisi (puantaj) gelmedi ve MUHSGK süresi yaklaşıyor / geçti
+  for (const donem of sonBordroDonemleri(bugunYmd, 2)) {
+    for (const m of bordroMukellefleri()) {
+      const s = bordroSatiri(m, donem, bugunYmd)
+      if (s.durum !== "BEKLENIYOR" || s.uyari === "YOK") continue
+      ekle({
+        tur: "BORDRO_GIRDI_BEKLIYOR",
+        anahtar: `BORDRO_GIRDI:${m.id}:${donem}:${s.uyari}`,
+        aliciId: m.sorumluPersonelId,
+        baslik:
+          s.uyari === "GECIKTI"
+            ? "Bordro girdisi gelmedi, MUHSGK süresi geçti"
+            : `Bordro girdisi gelmedi, MUHSGK'ye ${s.kalanIsGunu} iş günü kaldı`,
+        aciklama: `${m.unvan} · ${formatDonem(donem)}`,
+        link: `/mukellefler/${m.id}/bordro?bordro=${m.id}:${donem}`,
+        mukellefId: m.id,
+        hedefTip: "BORDRO",
+        hedefId: `${m.id}:${donem}`,
+      })
+    }
+  }
+
+  // İşe giriş / çıkış bildirimi: süre yaklaşıyor ya da geçti
+  for (const h of db.isHareketi.where((h) => h.durum === "BEKLIYOR")) {
+    const m = db.mukellef.find(h.mukellefId)
+    const v = hareketView(h, bugunYmd)
+    if (!m?.aktif || v.uyari === "YOK") continue
+    ekle({
+      tur: "ISE_HAREKETI_SURE",
+      anahtar: `ISE_HAREKETI:${h.id}:${v.uyari}`,
+      aliciId: m.sorumluPersonelId,
+      baslik:
+        v.uyari === "GECIKTI"
+          ? `${HAREKET_TUR_ETIKET[h.tur]} bildirimi gecikti`
+          : `${HAREKET_TUR_ETIKET[h.tur]} bildirimi için son gün yaklaşıyor`,
+      aciklama: `${m.unvan} · ${h.kisi}`,
+      link: `/mukellefler/${m.id}/bordro`,
+      mukellefId: m.id,
+      hedefTip: "BORDRO",
+      hedefId: h.id,
     })
   }
 

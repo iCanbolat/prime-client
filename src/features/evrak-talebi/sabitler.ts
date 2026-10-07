@@ -15,6 +15,8 @@ export interface IstenenEvrakTanimi {
   kategori: ArsivKategori
   /** Portalda müşteriye kısa açıklama */
   ipucu?: string
+  /** Maaş / kişisel veri içerir: bağlantı varsayılan olarak kısa ömürlü tutulur */
+  hassas?: boolean
 }
 
 export const ISTENEN_EVRAKLAR: Record<IstenenEvrak, IstenenEvrakTanimi> = {
@@ -43,14 +45,42 @@ export const ISTENEN_EVRAKLAR: Record<IstenenEvrak, IstenenEvrakTanimi> = {
     kategori: "TICARET_SICIL_GAZETESI",
   },
   FAALIYET_BELGESI: { ad: "Faaliyet belgesi", kategori: "FAALIYET_BELGESI" },
-  SGK_BELGELERI: { ad: "SGK işe giriş / çıkış belgeleri", kategori: "DIGER" },
+  PUANTAJ: {
+    ad: "Puantaj / ek ödeme-kesinti bilgisi",
+    kategori: "BORDRO",
+    ipucu:
+      "Dönem puantajı: izin, fazla mesai, prim, avans ve kesinti (icra, nafaka) bilgileri. İstirahat raporlarını büronuz SGK'dan alır.",
+    hassas: true,
+  },
+  ISE_GIRIS_CIKIS: {
+    ad: "İşe giriş / çıkış belgeleri",
+    kategori: "SGK_BELGESI",
+    ipucu: "Yeni işe başlayan veya ayrılan çalışanların bilgi ve belgeleri.",
+    hassas: true,
+  },
+  IMZALI_BORDRO: {
+    ad: "İmzalı bordro",
+    kategori: "BORDRO",
+    ipucu: "Çalışanlarca imzalanmış dönem bordrosu.",
+    hassas: true,
+  },
+  UCRET_DEKONTU: {
+    ad: "Ücret ödeme dekontu",
+    kategori: "BORDRO",
+    ipucu:
+      "Maaşların banka yoluyla ödendiğini gösteren dekont veya toplu ödeme listesi.",
+    hassas: true,
+  },
   DIGER: { ad: "Diğer evraklar", kategori: "DIGER" },
 }
 
 export const ISTENEN_SIRASI: IstenenEvrak[] = [
   "FIS_FATURA",
   "BANKA_EKSTRESI",
-  "SGK_BELGELERI",
+  "PUANTAJ",
+  "ISE_GIRIS_CIKIS",
+  "IMZALI_BORDRO",
+  "UCRET_DEKONTU",
   "KIRA_SOZLESMESI",
   "KIMLIK",
   "IMZA_SIRKULERI",
@@ -69,6 +99,8 @@ export const KATEGORIDEN_ISTENEN: Partial<Record<ArsivKategori, IstenenEvrak>> =
     KIRA_SOZLESMESI: "KIRA_SOZLESMESI",
     FAALIYET_BELGESI: "FAALIYET_BELGESI",
     KIMLIK: "KIMLIK",
+    BORDRO: "IMZALI_BORDRO",
+    SGK_BELGESI: "ISE_GIRIS_CIKIS",
     BANKA_EKSTRESI: "BANKA_EKSTRESI",
     DIGER: "DIGER",
   }
@@ -94,6 +126,19 @@ export const TALEP_DURUM_ETIKET: Record<TalepDurumu, string> = {
 
 export const GECERLILIK_SECENEKLERI = [3, 7, 14, 30] as const
 export const VARSAYILAN_GECERLILIK_GUN = 7
+/** Bordro / SGK gibi hassas evraklar için varsayılan bağlantı ömrü */
+export const HASSAS_GECERLILIK_GUN = 3
+
+/** Seçilen evraklardan biri hassassa true */
+export function hassasMi(istenenler: IstenenEvrak[]): boolean {
+  return istenenler.some((i) => ISTENEN_EVRAKLAR[i]?.hassas)
+}
+
+export function varsayilanGecerlilik(istenenler: IstenenEvrak[]): number {
+  return hassasMi(istenenler)
+    ? HASSAS_GECERLILIK_GUN
+    : VARSAYILAN_GECERLILIK_GUN
+}
 
 /** Büro şablonu yoksa kullanılan mesajlar */
 export const VARSAYILAN_SABLONLAR: Record<MesajSablonTip, string> = {

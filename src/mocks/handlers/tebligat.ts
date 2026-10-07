@@ -16,7 +16,10 @@ import {
   SURE_KURALLARI,
   tebligatTuru,
 } from "@/features/tebligat/kurallar"
-import { TEBLIGAT_TUR_ETIKET } from "@/features/tebligat/sabitler"
+import {
+  TEBLIGAT_KASA_SISTEMI,
+  TEBLIGAT_TUR_ETIKET,
+} from "@/features/tebligat/sabitler"
 import { bugun, fromYmd, toYmd } from "@/lib/tarih"
 import { putBlob } from "@/mocks/blob-store"
 import { db } from "@/mocks/db"
@@ -283,10 +286,16 @@ function geceTaramasiGerekirse() {
   return calisanTarama
 }
 
+const kasaKaydi = (mukellefId: string) =>
+  db.credential.where(
+    (c) => c.mukellefId === mukellefId && c.sistem === TEBLIGAT_KASA_SISTEMI
+  )[0]
+
 function erisimSatiri(
   m: Mukellef,
   e: TebligatErisim | undefined
 ): TebligatErisimSatiri {
+  const kasa = kasaKaydi(m.id)
   return {
     mukellefId: m.id,
     mukellefUnvan: m.unvan,
@@ -294,6 +303,12 @@ function erisimSatiri(
     sorumluPersonelId: m.sorumluPersonelId,
     durum: e?.durum ?? "TANIMSIZ",
     erisim: e ?? null,
+    kasaKaydiId: kasa?.id,
+    kasaDahaYeni: Boolean(
+      kasa &&
+      e?.kasaKaynagi?.credentialId === kasa.id &&
+      kasa.sonGuncelleme > e.kasaKaynagi.credentialGuncelleme
+    ),
   }
 }
 
@@ -345,6 +360,17 @@ export const tebligatHandlers = [
         return errorResponse(400, "Kullanıcı kodu 6–11 haneli olmalı")
       if (!body.sifre || body.sifre.length < 4)
         return errorResponse(400, "Şifre en az 4 karakter olmalı")
+      const kasa = body.kasaCredentialId
+        ? db.credential.find(body.kasaCredentialId)
+        : undefined
+      if (
+        body.kasaCredentialId &&
+        (kasa?.mukellefId !== m.id || kasa.sistem !== TEBLIGAT_KASA_SISTEMI)
+      )
+        return errorResponse(
+          400,
+          "Kasa kaydı bu mükellefin İnteraktif VD kaydı değil"
+        )
       const sonuc = await mockGibAdapter().girisDogrula({
         kullaniciKodu,
         sifre: body.sifre,
@@ -357,6 +383,9 @@ export const tebligatHandlers = [
         sifreIpucu: body.sifre.slice(-4),
         durum: "AKTIF" as const,
         hataMesaji: undefined,
+        kasaKaynagi: kasa
+          ? { credentialId: kasa.id, credentialGuncelleme: kasa.sonGuncelleme }
+          : undefined,
         tanimlayanId: actor.id,
         tanimlamaTarihi: new Date().toISOString(),
       }
@@ -371,10 +400,25 @@ export const tebligatHandlers = [
           hedefTip: "MUKELLEF",
           hedefId: m.id,
           mukellefId: m.id,
-          aciklama: m.unvan,
+          aciklama: kasa
+            ? `${m.unvan} · kasadaki İnteraktif VD kaydından`
+            : m.unvan,
         },
         false
       )
+      // Kasadaki şifrenin sunucuya aktarılması kaydın erişim geçmişine yazılır
+      if (kasa)
+        logActivity(
+          {
+            aktorId: actor.id,
+            eylem: "SIFRE_TEBLIGATA_AKTARILDI",
+            hedefTip: "CREDENTIAL",
+            hedefId: kasa.id,
+            mukellefId: m.id,
+            aciklama: kasa.sistem,
+          },
+          false
+        )
       return HttpResponse.json(erisimSatiri(m, e))
     }
   ),

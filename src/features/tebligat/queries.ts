@@ -66,10 +66,11 @@ export function useTebligatErisimleri(
   })
 }
 
-export function useTebligatErisim(mukellefId: string) {
+export function useTebligatErisim(mukellefId: string, enabled = true) {
   return useQuery({
     queryKey: tebligatKeys.erisim(mukellefId),
     queryFn: () => tebligatApi.erisim(mukellefId),
+    enabled,
   })
 }
 

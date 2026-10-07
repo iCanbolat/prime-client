@@ -36,6 +36,7 @@ import {
   type useArsivParams,
 } from "@/features/arsiv/hooks/use-arsiv-params"
 import { useArsivList } from "@/features/arsiv/queries"
+import { formatDonem } from "@/lib/format"
 import type { ArsivSiralama, SiralamaYonu } from "@/types/api"
 
 const SIRALAMA_ETIKET = {
@@ -190,6 +191,7 @@ export function DosyaAlani({
   gosterMukellef,
   onYukle,
   onSayfa,
+  onDonemKaldir,
 }: {
   params: ArsivParams
   mukellefId?: string
@@ -197,6 +199,7 @@ export function DosyaAlani({
   gosterMukellef: boolean
   onYukle?: () => void
   onSayfa: (sayfa: number) => void
+  onDonemKaldir: () => void
 }) {
   const liste = useArsivList({
     mukellefId,
@@ -206,9 +209,19 @@ export function DosyaAlani({
     yon: params.yon,
     cop: params.cop || undefined,
     gecerlilik: params.cop ? undefined : params.gecerlilik,
+    donem: params.cop ? undefined : params.donem,
     sayfa: params.sayfa,
     sayfaBoyutu: ARSIV_SAYFA_BOYUTU,
   })
+
+  const donemFiltresi = params.donem && !params.cop && (
+    <p className="text-sm text-muted-foreground">
+      Yalnızca {formatDonem(params.donem)} dönemine bağlı belgeler gösteriliyor.{" "}
+      <button type="button" className="underline" onClick={onDonemKaldir}>
+        Dönem filtresini kaldır
+      </button>
+    </p>
+  )
 
   if (liste.isError)
     return <ErrorState error={liste.error} onRetry={() => liste.refetch()} />
@@ -230,28 +243,32 @@ export function DosyaAlani({
     if (params.cop)
       return <EmptyState icon={Delete02Icon} title="Çöp kutusu boş" />
     return (
-      <EmptyState
-        icon={FolderOpenIcon}
-        title={
-          params.q || params.gecerlilik
-            ? "Filtreyle eşleşen dosya yok"
-            : "Bu klasörde dosya yok"
-        }
-        action={
-          onYukle &&
-          !params.q &&
-          !params.gecerlilik && (
-            <Button size="sm" onClick={onYukle}>
-              <HugeiconsIcon
-                icon={Upload04Icon}
-                strokeWidth={2}
-                data-icon="inline-start"
-              />
-              Dosya yükle
-            </Button>
-          )
-        }
-      />
+      <>
+        {donemFiltresi}
+        <EmptyState
+          icon={FolderOpenIcon}
+          title={
+            params.q || params.gecerlilik || params.donem
+              ? "Filtreyle eşleşen dosya yok"
+              : "Bu klasörde dosya yok"
+          }
+          action={
+            onYukle &&
+            !params.q &&
+            !params.gecerlilik &&
+            !params.donem && (
+              <Button size="sm" onClick={onYukle}>
+                <HugeiconsIcon
+                  icon={Upload04Icon}
+                  strokeWidth={2}
+                  data-icon="inline-start"
+                />
+                Dosya yükle
+              </Button>
+            )
+          }
+        />
+      </>
     )
   }
 
@@ -263,6 +280,7 @@ export function DosyaAlani({
   }
   return (
     <>
+      {donemFiltresi}
       {params.gorunum === "liste" ? (
         <DosyaTablo {...props} />
       ) : (

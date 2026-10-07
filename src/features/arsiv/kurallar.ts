@@ -99,6 +99,8 @@ export const KATEGORI_SIRASI: ArsivKategori[] = [
   "TAHAKKUK",
   "MIZAN",
   "TEBLIGAT",
+  "BORDRO",
+  "SGK_BELGESI",
   "DIGER",
 ]
 

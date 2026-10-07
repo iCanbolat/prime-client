@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { Download04Icon } from "@hugeicons/core-free-icons"
+import { Download04Icon, Clock01Icon } from "@hugeicons/core-free-icons"
+import { toast } from "sonner"
 
 import { ErrorState, LoadingState } from "@/components/shared/query-states"
-import { buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -11,9 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { aktiviteKeys } from "@/features/aktivite/queries"
+import { dosyaIndir } from "@/lib/dosya"
+import type { DosyaErisimIslemi } from "@/types/api"
 
 import { arsivApi } from "@/features/arsiv/api"
+import { ErisimGecmisi } from "@/features/arsiv/components/erisim-gecmisi"
 import { arsivKeys } from "@/features/arsiv/queries"
 import { eBelgeApi } from "@/features/e-belge/api"
 import { eBelgeKeys } from "@/features/e-belge/queries"
@@ -38,7 +43,7 @@ const ICERIK_KAYNAKLARI = {
   OnizlenecekDosya["kaynak"],
   {
     key: (id: string) => readonly unknown[]
-    fn: (id: string) => Promise<{ dataUrl: string }>
+    fn: (id: string, islem?: DosyaErisimIslemi) => Promise<{ dataUrl: string }>
   }
 >
 
@@ -78,18 +83,39 @@ function useBlobUrl(dataUrl: string | undefined) {
 /** Dosya içeriği (PDF iframe'i ya da görsel) ve indirme bağlantısı; pencere dışında da kullanılır */
 export function DosyaIcerigi({ dosya }: { dosya: OnizlenecekDosya }) {
   const icerik = useDosyaIcerik(dosya)
+  const queryClient = useQueryClient()
+  const [indiriliyor, setIndiriliyor] = useState(false)
+  const [gecmisAcik, setGecmisAcik] = useState(false)
   const dataUrl = icerik.data?.dataUrl
   const blobUrl = useBlobUrl(dataUrl)
+
+  // İndirme sunucuda ayrıca kaydedilir (`?islem=indir`); içerik önizleme için zaten elimizde
+  const indirTikla = async () => {
+    setIndiriliyor(true)
+    try {
+      const { dataUrl: icerikUrl } = await ICERIK_KAYNAKLARI[dosya.kaynak].fn(
+        dosya.id,
+        "indir"
+      )
+      dosyaIndir(await (await fetch(icerikUrl)).blob(), dosya.ad)
+      void queryClient.invalidateQueries({ queryKey: aktiviteKeys.all })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "İndirilemedi")
+    } finally {
+      setIndiriliyor(false)
+    }
+  }
 
   if (icerik.isError)
     return <ErrorState error={icerik.error} onRetry={() => icerik.refetch()} />
   if (!dataUrl) return <LoadingState />
 
   const indir = (
-    <a
-      href={dataUrl}
-      download={dosya.ad}
-      className={buttonVariants({ variant: "outline", size: "sm" })}
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => void indirTikla()}
+      disabled={indiriliyor}
     >
       <HugeiconsIcon
         icon={Download04Icon}
@@ -97,7 +123,7 @@ export function DosyaIcerigi({ dosya }: { dosya: OnizlenecekDosya }) {
         data-icon="inline-start"
       />
       İndir
-    </a>
+    </Button>
   )
 
   let govde
@@ -135,7 +161,23 @@ export function DosyaIcerigi({ dosya }: { dosya: OnizlenecekDosya }) {
   return (
     <div className="grid gap-3">
       {govde}
-      <div className="flex justify-end">{indir}</div>
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={gecmisAcik}
+          onClick={() => setGecmisAcik((a) => !a)}
+        >
+          <HugeiconsIcon
+            icon={Clock01Icon}
+            strokeWidth={2}
+            data-icon="inline-start"
+          />
+          Erişim geçmişi
+        </Button>
+        {indir}
+      </div>
+      {gecmisAcik && <ErisimGecmisi dosyaId={dosya.id} />}
     </div>
   )
 }

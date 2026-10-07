@@ -21,6 +21,8 @@ const SAYFALAR = [
   "/e-belge/baglantilar",
   "/tebligat",
   "/tebligat?erisim=",
+  "/bordro",
+  "/bordro?sekme=hareket",
   "/tahsilat/ozet",
   "/tahsilat/cari",
   "/tahsilat/kesinti",
@@ -47,6 +49,7 @@ const MUKELLEF_SEKMELERI = [
   "gorevler",
   "e-belge",
   "tebligat",
+  "bordro",
   "tahsilat",
   "fis-aktarimi",
 ]

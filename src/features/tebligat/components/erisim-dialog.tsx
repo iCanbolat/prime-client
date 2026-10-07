@@ -19,6 +19,8 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { useCredentials } from "@/features/kasa/queries"
+import { useKasadanAktar } from "@/features/tebligat/kasa-aktarim"
 import { useTebligatErisimKaydet } from "@/features/tebligat/queries"
 import { ApiError } from "@/lib/http"
 import { z } from "@/lib/zod"
@@ -33,6 +35,35 @@ const erisimSchema = z.object({
 })
 
 type ErisimFormValues = z.infer<typeof erisimSchema>
+
+/** Kasadaki İnteraktif VD kaydı varsa şifreyi yeniden yazmadan aktarma */
+function KasadanKullan({
+  satir,
+  onClose,
+}: {
+  satir: TebligatErisimSatiri
+  onClose: () => void
+}) {
+  const credentials = useCredentials({ mukellefId: satir.mukellefId })
+  const { aktar, isPending } = useKasadanAktar()
+  const kayit = credentials.data?.find((c) => c.id === satir.kasaKaydiId)
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm">
+      <span className="text-muted-foreground">
+        Şifre kasasında bu mükellefin İnteraktif VD kaydı var
+        {kayit && ` (${kayit.kullaniciAdi})`}.
+      </span>
+      <Button
+        type="button"
+        size="sm"
+        disabled={!kayit || isPending}
+        onClick={() => kayit && aktar(kayit, onClose)}
+      >
+        {isPending ? "Aktarılıyor…" : "Kasadaki şifreyi kullan"}
+      </Button>
+    </div>
+  )
+}
 
 /** Şifre yalnızca bu formda yaşar; backend'e bir kez gider, yanıtta son 4 karakteri döner */
 function ErisimForm({
@@ -76,6 +107,7 @@ function ErisimForm({
           bildirim e-postası ayarına dokunmanız gerekmez.
         </DialogDescription>
       </DialogHeader>
+      {satir.kasaKaydiId && <KasadanKullan satir={satir} onClose={onClose} />}
       <FieldGroup>
         <Field data-invalid={Boolean(errors.kullaniciKodu) || undefined}>
           <FieldLabel htmlFor="erisim-kullanici">
@@ -102,7 +134,7 @@ function ErisimForm({
           <FieldDescription>
             {mevcut
               ? `Kayıtlı şifre ••••${mevcut.sifreIpucu}. Değiştirmek için yenisini girin.`
-              : "Sunucuda şifreli saklanır, bir daha gösterilmez. Şifre kasasındaki kayıttan bağımsızdır."}
+              : "Sunucuda kasadan ayrı, şifreli saklanır ve bir daha gösterilmez."}
           </FieldDescription>
           <FieldError>{errors.sifre?.message}</FieldError>
         </Field>

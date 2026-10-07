@@ -61,6 +61,8 @@ export function bildirimLinki(
       return mukellefId ? `/mukellefler/${mukellefId}/tahsilat` : "/tahsilat"
     case "MUKELLEF":
       return mukellefId ? `/mukellefler/${mukellefId}` : "/mukellefler"
+    case "BORDRO":
+      return mukellefId ? `/mukellefler/${mukellefId}/bordro` : "/bordro"
     case "FIS":
       return hedefId
         ? `/fis-aktarimi/taslaklar?fis=${hedefId}`

@@ -26,6 +26,9 @@ beforeEach(() => {
   for (const h of db.cari.all()) db.cari.remove(h.id)
   for (const m of db.mukellef.all())
     db.mukellef.update(m.id, { ucret: undefined })
+  // ...bordro girdisi bekleyen (çalışanı olan) mükellef kalmasın...
+  for (const m of db.mukellef.all())
+    db.mukellef.update(m.id, { calisanSayisi: 0, sgkIsyeriVar: false })
   // ...ve süresi yaklaşan tebligat
   for (const t of db.tebligat.all())
     db.tebligat.update(t.id, { durum: "KAPANDI" })

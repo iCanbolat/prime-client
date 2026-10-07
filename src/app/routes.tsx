@@ -184,6 +184,15 @@ export const routes: RouteObject[] = [
                         }),
                       },
                       {
+                        path: "bordro",
+                        handle: crumb("Bordro"),
+                        lazy: async () => ({
+                          Component: (
+                            await import("@/features/bordro/pages/mukellef-bordro-tab")
+                          ).MukellefBordroTab,
+                        }),
+                      },
+                      {
                         path: "tahsilat",
                         handle: crumb("Tahsilat"),
                         lazy: async () => ({
@@ -313,6 +322,14 @@ export const routes: RouteObject[] = [
               Component: (
                 await import("@/features/tebligat/pages/tebligat-page")
               ).TebligatPage,
+            }),
+          },
+          {
+            path: "bordro",
+            handle: crumb("Bordro takibi"),
+            lazy: async () => ({
+              Component: (await import("@/features/bordro/pages/bordro-page"))
+                .BordroPage,
             }),
           },
           {
