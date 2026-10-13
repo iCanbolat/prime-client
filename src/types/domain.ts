@@ -177,6 +177,17 @@ export type AktiviteEylem =
   | "PERSONEL_GUNCELLENDI"
   | "PERSONEL_SIFRESI_DEGISTI"
   | "PERSONEL_SILINDI"
+  | "SGK_ERISIMI_TANIMLANDI"
+  | "SGK_ERISIMI_KALDIRILDI"
+  | "SGK_ERISIM_HATASI"
+  | "SIFRE_SGK_SORGUSUNA_AKTARILDI"
+  | "VERGI_LEVHASI_ALINDI"
+  | "BORC_SORGULANDI"
+  | "BORC_TESPIT_EDILDI"
+  | "BORCU_YOKTUR_TALEP_EDILDI"
+  | "BORCU_YOKTUR_SONUCLANDI"
+  | "KAMU_DOGRULAMA_BEKLIYOR"
+  | "KAMU_DOGRULAMA_TAMAMLANDI"
 
 export interface AktiviteLog {
   id: string
@@ -194,6 +205,7 @@ export interface AktiviteLog {
     | "TEBLIGAT"
     | "FIS"
     | "BORDRO"
+    | "BORC"
   hedefId?: string
   /** Kaydın ilişkili olduğu mükellef (mükellef kartındaki aktivite akışı için) */
   mukellefId?: string
@@ -320,6 +332,7 @@ export type ArsivKategori =
   | "TEBLIGAT"
   | "BORDRO"
   | "SGK_BELGESI"
+  | "BORCU_YOKTUR"
   | "DIGER"
 
 /**
@@ -572,6 +585,7 @@ export const ARSIV_KATEGORI_ETIKET: Record<ArsivKategori, string> = {
   TEBLIGAT: "e-Tebligat",
   BORDRO: "Bordro",
   SGK_BELGESI: "SGK belgesi",
+  BORCU_YOKTUR: "Borcu yoktur yazısı",
   DIGER: "Diğer",
 }
 
@@ -804,6 +818,134 @@ export interface TebligatTarama {
   hatali: number
   /** Kaydedilen yeni tebligat sayısı */
   yeni: number
+}
+
+// --- Borç ve levha sorguları (Faz 14) ------------------------------------------------
+
+/** Sorgunun yapıldığı kamu sistemi: GİB (İnteraktif VD) veya SGK (İşveren Sistemi) */
+export type KamuKurum = "GIB" | "SGK"
+
+export type SgkErisimDurumu = "AKTIF" | "HATA"
+
+/**
+ * Mükellefin SGK İşveren Sistemi erişimi (yalnızca SGK işyeri olanlarda). Backend bu bilgilerle
+ * prim borcunu sorgular ve borcu yoktur yazısı ister. Şifreler yalnızca backend'de (KMS ile
+ * şifreli) saklanır; istemci ve mock DB son 4 karakteri görür. GİB tarafı ayrı erişim istemez:
+ * e-Tebligat için tanımlı İVD erişimi (`TebligatErisim`) kullanılır.
+ */
+export interface SgkErisim {
+  id: string
+  mukellefId: string
+  kullaniciAdi: string
+  isyeriKodu: string
+  sistemSifreIpucu: string
+  isyeriSifreIpucu: string
+  durum: SgkErisimDurumu
+  hataMesaji?: string
+  /** Son başarılı sorgu */
+  sonSorgu?: ISODateString
+  /** Şifreler kasadaki SGK kaydından aktarıldıysa (bkz. `TebligatErisim.kasaKaynagi`) */
+  kasaKaynagi?: { credentialId: string; credentialGuncelleme: ISODateString }
+  tanimlayanId: string
+  tanimlamaTarihi: ISODateString
+}
+
+/** GİB'den alınan vergi levhası (mükellef + levha yılı başına bir kayıt; PDF arşivde) */
+export interface VergiLevhasi {
+  id: string
+  mukellefId: string
+  /** Levhanın ait olduğu hesap dönemi, ör. 2025 */
+  yil: number
+  vergiTuru: string
+  /** Beyan edilen matrah (TL); levhada yoksa boş */
+  matrah?: number
+  onayKodu: string
+  sorguTarihi: ISODateString
+  arsivDosyaId: string
+}
+
+/** Borç dökümünün bir kalemi. Toplam ve "vadesi geçti" saklanmaz, türetilir. */
+export interface BorcKalemi {
+  /** Vergi / prim türü metni, ör. "Katma Değer Vergisi", "SGK primi" */
+  tur: string
+  /** Takvimdeki yükümlülük karşılığı (tahakkuk eşleştirmesi için) */
+  yukumlulukTip?: YukumlulukTip
+  /** Takvim dönemi: "2026-08" / "2026-Q2" / "2025" */
+  donem?: string
+  /** yyyy-MM-dd */
+  vade: string
+  asil: number
+  gecikme: number
+}
+
+/** Bir mükellefin bir kurumdaki son borç sorgusu. id = `${mukellefId}:${kurum}` */
+export interface BorcSorgusu {
+  id: string
+  mukellefId: string
+  kurum: KamuKurum
+  kalemler: BorcKalemi[]
+  sorguTarihi: ISODateString
+  sorgulayanId: string
+}
+
+/**
+ * `DOGRULAMA_BEKLIYOR`: talep, GİB/SGK girişindeki doğrulama ekranı personelce çözülene kadar
+ * gönderilmedi. `TALEP_EDILDI`: kurum yazıyı hazırlıyor. Süresi dolan yazı ayrıca saklanmaz.
+ */
+export type BorcuYokturDurum =
+  "DOGRULAMA_BEKLIYOR" | "TALEP_EDILDI" | "HAZIR" | "BORCU_VAR" | "HATA"
+
+export interface BorcuYokturTalebi {
+  id: string
+  mukellefId: string
+  kurum: KamuKurum
+  /** Kurumun verdiği talep numarası (gönderilince) */
+  talepNo?: string
+  durum: BorcuYokturDurum
+  talepEdenId: string
+  talepTarihi: ISODateString
+  sonucTarihi?: ISODateString
+  /** Hazır yazının arşiv kaydı */
+  arsivDosyaId?: string
+  /** yyyy-MM-dd */
+  gecerlilikTarihi?: string
+  /** BORCU_VAR / HATA açıklaması */
+  aciklama?: string
+}
+
+/** Doğrulama çözülünce aynı oturumla çalıştırılacak sorgu adımları */
+export type KamuAdim = "VERGI_LEVHASI" | "BORC" | "BORCU_YOKTUR"
+
+/**
+ * GİB/SGK girişinde çıkan doğrulama ekranı (CAPTCHA). Otomatik geçilmez: robot durur, kayıt
+ * açılır, mükellef sorumlusuna bildirim gider; personel görseldeki kodu uygulamada girer ve
+ * bekleyen adımlar aynı oturumla devam eder. Mükellef + kurum başına en çok bir kayıt.
+ */
+export interface KamuDogrulama {
+  id: string
+  mukellefId: string
+  kurum: KamuKurum
+  /** Kurumun doğrulama oturumunun kimliği (backend'de tutulur) */
+  oturumId: string
+  /** Kısa ömürlü doğrulama görseli; loglanmaz */
+  gorselDataUrl: string
+  sonGecerlilik: ISODateString
+  bekleyenAdimlar: KamuAdim[]
+  olusturmaTarihi: ISODateString
+}
+
+/** Büro geneli gece borç / levha sorgusu çalışması (gerçek backend'de zamanlanmış iş) */
+export interface KamuTarama {
+  id: string
+  baslangic: ISODateString
+  bitis: ISODateString
+  /** Sorgulanan mükellef × kurum sayısı */
+  sorgulanan: number
+  hatali: number
+  /** Doğrulama ekranı nedeniyle bekleyen */
+  dogrulama: number
+  /** Alınan yeni vergi levhası */
+  levha: number
 }
 
 // --- Gönderim kanalları ------------------------------------------------------------

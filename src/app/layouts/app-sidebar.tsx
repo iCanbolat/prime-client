@@ -23,12 +23,14 @@ import { useEBelgeOzet } from "@/features/e-belge/queries"
 import { useGelenSayac } from "@/features/evrak-talebi/queries"
 import { useFisSayac } from "@/features/fis-aktarimi/queries"
 import { useTebligatOzet } from "@/features/tebligat/queries"
+import { useBorcOzet } from "@/features/borc/queries"
 
 const SAYAC_ETIKET = {
   gelenEvrak: "inceleme bekleyen evrak",
   yanitBekleyen: "yanıt bekleyen fatura",
   acikTebligat: "açık e-Tebligat",
   fisTaslak: "onay bekleyen fiş",
+  kamuDogrulama: "doğrulama bekleyen GİB / SGK girişi",
 } as const
 
 export function AppSidebar() {
@@ -38,7 +40,9 @@ export function AppSidebar() {
   const eBelge = useEBelgeOzet()
   const tebligat = useTebligatOzet()
   const fis = useFisSayac()
+  const borc = useBorcOzet()
   const sayaclar = {
+    kamuDogrulama: borc.data?.dogrulamaBekleyen ?? 0,
     fisTaslak: fis.data?.taslak ?? 0,
     acikTebligat: tebligat.data?.acik ?? 0,
     gelenEvrak: gelen.data?.bekleyen ?? 0,

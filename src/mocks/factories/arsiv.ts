@@ -28,6 +28,7 @@ const DOSYA_ADLARI: Record<ArsivKategori, string[]> = {
   TEBLIGAT: ["e-Tebligat.pdf"],
   BORDRO: ["Bordro.pdf"],
   SGK_BELGESI: ["SGK işe giriş bildirgesi.pdf"],
+  BORCU_YOKTUR: ["Borcu yoktur yazısı.pdf"],
   DIGER: [
     "Banka yazısı.pdf",
     "Ruhsat.pdf",

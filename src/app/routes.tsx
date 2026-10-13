@@ -184,6 +184,15 @@ export const routes: RouteObject[] = [
                         }),
                       },
                       {
+                        path: "borc",
+                        handle: crumb("Borç ve levha"),
+                        lazy: async () => ({
+                          Component: (
+                            await import("@/features/borc/pages/mukellef-borc-tab")
+                          ).MukellefBorcTab,
+                        }),
+                      },
+                      {
                         path: "bordro",
                         handle: crumb("Bordro"),
                         lazy: async () => ({
@@ -322,6 +331,14 @@ export const routes: RouteObject[] = [
               Component: (
                 await import("@/features/tebligat/pages/tebligat-page")
               ).TebligatPage,
+            }),
+          },
+          {
+            path: "borc-levha",
+            handle: crumb("Borç ve levha"),
+            lazy: async () => ({
+              Component: (await import("@/features/borc/pages/borc-levha-page"))
+                .BorcLevhaPage,
             }),
           },
           {

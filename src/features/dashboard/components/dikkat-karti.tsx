@@ -27,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type {
   ArsivOzetResponse,
+  BorcOzetResponse,
   BordroOzetResponse,
   EBelgeOzetResponse,
   TebligatOzetResponse,
@@ -76,6 +77,42 @@ function tebligatSatirlari(o: TebligatOzetResponse): Satir[] {
       deger: o.acik,
       to: "/tebligat?kapsam=acik",
       icon: LegalDocument01Icon,
+      ton: "notr",
+    },
+  ]
+}
+
+function borcSatirlari(o: BorcOzetResponse): Satir[] {
+  return [
+    {
+      etiket: "Vadesi geçmiş vergi borcu",
+      deger: o.gib.vadesiGecmisMukellef,
+      birim: "mükellef",
+      to: "/borc-levha?sekme=vergi&kapsam=vadesiGecmis",
+      icon: Coins01Icon,
+      ton: "tehlike",
+    },
+    {
+      etiket: "Vadesi geçmiş SGK prim borcu",
+      deger: o.sgk.vadesiGecmisMukellef,
+      birim: "mükellef",
+      to: "/borc-levha?sekme=sgk&kapsam=vadesiGecmis",
+      icon: Coins01Icon,
+      ton: "tehlike",
+    },
+    {
+      etiket: "Doğrulama kodu bekleyen GİB / SGK girişi",
+      deger: o.dogrulamaBekleyen,
+      to: "/borc-levha?dogrulama=",
+      icon: Coins01Icon,
+      ton: "uyari",
+    },
+    {
+      etiket: "Vergi levhası alınmamış",
+      deger: o.levhaEksik,
+      birim: "mükellef",
+      to: "/borc-levha?sekme=levha&kapsam=eksik",
+      icon: Coins01Icon,
       ton: "notr",
     },
   ]
@@ -259,12 +296,14 @@ export function DikkatKarti({
   eBelge,
   arsiv,
   bordro,
+  borc,
   className,
 }: {
   tebligat: Kaynak<TebligatOzetResponse>
   eBelge: Kaynak<EBelgeOzetResponse>
   arsiv: Kaynak<ArsivOzetResponse>
   bordro: Kaynak<BordroOzetResponse>
+  borc: Kaynak<BorcOzetResponse>
   className?: string
 }) {
   const kaynaklar: { ad: string; k: Kaynak<unknown> }[] = [
@@ -272,6 +311,7 @@ export function DikkatKarti({
     { ad: "e-Belge", k: eBelge },
     { ad: "Arşiv", k: arsiv },
     { ad: "Bordro", k: bordro },
+    { ad: "Borç ve levha", k: borc },
   ]
   const yukleniyor = kaynaklar.some(({ k }) => !k.hata && !k.data)
   const hatalar = kaynaklar.filter(({ k }) => k.hata)
@@ -280,6 +320,7 @@ export function DikkatKarti({
     ...(eBelge.data ? eBelgeSatirlari(eBelge.data) : []),
     ...(arsiv.data ? arsivSatirlari(arsiv.data) : []),
     ...(bordro.data ? bordroSatirlari(bordro.data) : []),
+    ...(borc.data ? borcSatirlari(borc.data) : []),
   ]
     .filter((s) => s.deger > 0)
     .sort((a, b) => TON_SIRASI.indexOf(a.ton) - TON_SIRASI.indexOf(b.ton))
@@ -289,7 +330,7 @@ export function DikkatKarti({
       <CardHeader>
         <CardTitle>Dikkat gerektirenler</CardTitle>
         <CardDescription>
-          Tebligat, e-Belge, belge ve bordro uyarıları
+          Tebligat, e-Belge, belge, bordro ve borç uyarıları
         </CardDescription>
       </CardHeader>
       <CardContent>

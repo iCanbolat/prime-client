@@ -21,6 +21,7 @@ export const MUKELLEF_SEKMELERI = [
   { to: "e-belge", label: "e-Belge" },
   { to: "tebligat", label: "e-Tebligat" },
   { to: "bordro", label: "Bordro" },
+  { to: "borc", label: "Borç ve levha" },
   { to: "tahsilat", label: "Tahsilat" },
   { to: "fis-aktarimi", label: "Fiş Aktarımı" },
 ] as const

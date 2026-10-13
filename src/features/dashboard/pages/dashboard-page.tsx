@@ -5,6 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { useArsivOzet } from "@/features/arsiv/queries"
 import { useAuthStore } from "@/features/auth/store"
 import { useBordroOzet } from "@/features/bordro/queries"
+import { useBorcOzet } from "@/features/borc/queries"
 import { DikkatKarti } from "@/features/dashboard/components/dikkat-karti"
 import { TahsilatKarti } from "@/features/dashboard/components/tahsilat-karti"
 import { YapilacaklarKarti } from "@/features/dashboard/components/yapilacaklar-karti"
@@ -31,6 +32,7 @@ export function DashboardPage() {
   const tahsilat = useTahsilatOzet({ sorumlu })
   const tebligat = useTebligatOzet({ sorumlu })
   const bordro = useBordroOzet({ sorumlu })
+  const borc = useBorcOzet({ sorumlu })
 
   const takvimLinki = (sorgu: string) =>
     `/takvim?gorunum=liste&${sorgu}${sorumlu ? `&sorumlu=${sorumlu}` : ""}`
@@ -102,6 +104,7 @@ export function DashboardPage() {
               eBelge={kaynak(eBelge)}
               arsiv={kaynak(arsiv)}
               bordro={kaynak(bordro)}
+              borc={kaynak(borc)}
             />
             <TahsilatKarti
               ozet={tahsilat.data}

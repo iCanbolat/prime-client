@@ -131,10 +131,18 @@ describe("dev", () => {
       lucaAktarim: 0,
       bordro: 0,
       isHareketi: 0,
+      sgkErisim: 0,
+      vergiLevhasi: 0,
+      borcSorgusu: 0,
+      borcuYoktur: 0,
+      kamuDogrulama: 0,
+      kamuTarama: 0,
     })
     await http.post("/dev/reset")
     const seed = await http.get<Record<string, number>>("/dev/stats")
     expect(seed.mukellef).toBe(40)
     expect(seed.bordro).toBeGreaterThan(0)
+    expect(seed.borcSorgusu).toBeGreaterThan(0)
+    expect(seed.kamuDogrulama).toBe(1)
   })
 })

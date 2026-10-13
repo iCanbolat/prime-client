@@ -969,5 +969,11 @@ export function createFixtureState(): DbState {
     lucaAktarim: [],
     bordro: [],
     isHareketi: [],
+    sgkErisim: [],
+    vergiLevhasi: [],
+    borcSorgusu: [],
+    borcuYoktur: [],
+    kamuDogrulama: [],
+    kamuTarama: [],
   }
 }

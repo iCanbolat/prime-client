@@ -85,6 +85,17 @@ const EYLEM_ETIKET: Record<AktiviteEylem, string> = {
   PERSONEL_GUNCELLENDI: "personel bilgilerini güncelledi",
   PERSONEL_SIFRESI_DEGISTI: "personelin şifresini değiştirdi",
   PERSONEL_SILINDI: "personeli sildi",
+  SGK_ERISIMI_TANIMLANDI: "SGK sorgu erişimini tanımladı",
+  SGK_ERISIMI_KALDIRILDI: "SGK sorgu erişimini kaldırdı",
+  SGK_ERISIM_HATASI: "SGK İşveren Sistemi'ne giriş yapamadı",
+  SIFRE_SGK_SORGUSUNA_AKTARILDI: "şifreyi SGK sorgularına aktardı",
+  VERGI_LEVHASI_ALINDI: "vergi levhasını GİB'den aldı",
+  BORC_SORGULANDI: "borç sorguladı",
+  BORC_TESPIT_EDILDI: "vadesi geçmiş borç tespit etti",
+  BORCU_YOKTUR_TALEP_EDILDI: "borcu yoktur yazısı istedi",
+  BORCU_YOKTUR_SONUCLANDI: "borcu yoktur talebini sonuçlandırdı",
+  KAMU_DOGRULAMA_BEKLIYOR: "doğrulama ekranına takıldı",
+  KAMU_DOGRULAMA_TAMAMLANDI: "doğrulama kodunu girdi",
 }
 
 export function AktiviteListesi(params: AktiviteListParams) {

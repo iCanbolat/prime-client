@@ -1,5 +1,13 @@
 /** API istek/yanıt sözleşmeleri. MSW handler'ları ve feature api katmanı ortak kullanır. */
 import type {
+  BorcKalemi,
+  BorcuYokturDurum,
+  BorcuYokturTalebi,
+  KamuDogrulama,
+  KamuKurum,
+  KamuTarama,
+  SgkErisim,
+  VergiLevhasi,
   BordroBelgeTur,
   BordroDurum,
   BordroOzeti,
@@ -1431,4 +1439,195 @@ export interface IsHareketiEkleRequest {
 export interface IsHareketiGuncelleRequest {
   durum?: "BEKLIYOR" | "BILDIRILDI"
   belgeArsivId?: string | null
+}
+
+// --- Borç ve levha sorguları (Faz 14) -----------------------------------------------
+
+/**
+ * Bir mükellefin bir kurumdaki sorgu erişimi. GİB: e-Tebligat için tanımlı İVD erişimi;
+ * SGK: SGK İşveren Sistemi erişimi. `DOGRULAMA`: girişte doğrulama ekranı çıktı, personel bekleniyor.
+ */
+export type KamuErisimDurumu = "AKTIF" | "HATA" | "TANIMSIZ" | "DOGRULAMA"
+
+export interface BorcKalemiView extends BorcKalemi {
+  toplam: number
+  vadesiGecti: boolean
+  /** Aynı tip + dönem için içe aktarılmış tahakkuk (tahakkuk var ama ödenmemiş) */
+  tahakkukId?: string
+}
+
+export interface BorcToplami {
+  toplam: number
+  vadesiGecmis: number
+  kalemSayisi: number
+  /** yyyy-MM-dd; borç yoksa boş */
+  enEskiVade?: string
+}
+
+export interface BorcSatiri {
+  mukellefId: string
+  mukellefUnvan: string
+  vkn: string
+  sorumluPersonelId: string
+  kurum: KamuKurum
+  erisimDurumu: KamuErisimDurumu
+  /** Hiç sorgulanmadıysa null */
+  sorgu: (BorcToplami & { sorguTarihi: string }) | null
+}
+
+export type BorcKapsam = "borclu" | "vadesiGecmis" | "sorgulanmadi"
+
+export interface BorcListParams {
+  kurum: KamuKurum
+  q?: string
+  sorumlu?: string
+  kapsam?: BorcKapsam
+  sayfa?: number
+  sayfaBoyutu?: number
+}
+
+export interface BorcListResponse {
+  items: BorcSatiri[]
+  total: number
+  sayfa: number
+  sayfaBoyutu: number
+}
+
+export interface KamuDogrulamaView extends Omit<KamuDogrulama, "oturumId"> {
+  mukellefUnvan: string
+  suresiDoldu: boolean
+}
+
+export interface BorcDetay {
+  satir: BorcSatiri
+  kalemler: BorcKalemiView[]
+  dogrulama: KamuDogrulamaView | null
+}
+
+/** Sorgu tetikleyen isteklerin yanıtı: doğrulama ekranı çıktıysa `dogrulama` dolu, adım bekler */
+export interface KamuIslemSonucu {
+  dogrulama: KamuDogrulamaView | null
+}
+
+export interface LevhaSatiri {
+  mukellefId: string
+  mukellefUnvan: string
+  vkn: string
+  sorumluPersonelId: string
+  erisimDurumu: KamuErisimDurumu
+  /** En yeni levha */
+  levha: VergiLevhasi | null
+  /** Bugün beklenen levha yılı alınmış mı */
+  guncel: boolean
+}
+
+export interface LevhaListParams {
+  q?: string
+  sorumlu?: string
+  kapsam?: "eksik" | "guncel"
+  sayfa?: number
+  sayfaBoyutu?: number
+}
+
+export interface LevhaListResponse {
+  items: LevhaSatiri[]
+  total: number
+  sayfa: number
+  sayfaBoyutu: number
+  /** Bugün beklenen levha yılı */
+  beklenenYil: number
+}
+
+/** `SURESI_DOLDU` saklanmaz: hazır yazının geçerlilik tarihi geçmişse türetilir */
+export type BorcuYokturGorunum = BorcuYokturDurum | "SURESI_DOLDU"
+
+export interface BorcuYokturView extends BorcuYokturTalebi {
+  mukellefUnvan: string
+  talepEdenAd?: string
+  gorunum: BorcuYokturGorunum
+}
+
+export interface BorcuYokturListParams {
+  kurum?: KamuKurum
+  mukellefId?: string
+  /** `bekleyen` = doğrulama bekleyen + talep edildi */
+  kapsam?: "bekleyen" | "hazir" | "sonuclanan"
+  sayfa?: number
+  sayfaBoyutu?: number
+}
+
+export interface BorcuYokturListResponse {
+  items: BorcuYokturView[]
+  total: number
+  sayfa: number
+  sayfaBoyutu: number
+}
+
+export interface BorcuYokturTalepRequest {
+  mukellefId: string
+  kurum: KamuKurum
+}
+
+export interface BorcuYokturIslemSonucu extends KamuIslemSonucu {
+  talep: BorcuYokturView
+}
+
+export interface KurumBorcOzeti {
+  /** Vadesi geçmiş borcu olan mükellef sayısı */
+  vadesiGecmisMukellef: number
+  vadesiGecmisToplam: number
+  borcluMukellef: number
+}
+
+export interface BorcOzetResponse {
+  gib: KurumBorcOzeti
+  sgk: KurumBorcOzeti
+  /** Beklenen yılın levhası alınmamış aktif mükellef */
+  levhaEksik: number
+  dogrulamaBekleyen: number
+  borcuYokturBekleyen: number
+  sgkErisim: { aktif: number; hatali: number; tanimsiz: number }
+  /** GİB erişimi (e-Tebligat İVD) tanımsız ya da hatalı aktif mükellef */
+  gibErisimSorunlu: number
+  sonTarama: KamuTarama | null
+}
+
+export interface MukellefBorcResponse {
+  gib: BorcDetay
+  /** SGK işyeri yoksa null */
+  sgk: BorcDetay | null
+  levhalar: VergiLevhasi[]
+  borcuYoktur: BorcuYokturView[]
+}
+
+export type SgkErisimSatirDurumu = SgkErisim["durum"] | "TANIMSIZ"
+
+export interface SgkErisimSatiri {
+  mukellefId: string
+  mukellefUnvan: string
+  vkn: string
+  sorumluPersonelId: string
+  durum: SgkErisimSatirDurumu
+  erisim: SgkErisim | null
+  /** Mükellefin kasadaki SGK kaydı (varsa) */
+  kasaKaydiId?: string
+  kasaDahaYeni: boolean
+}
+
+export interface SgkErisimKaydetRequest {
+  kullaniciAdi: string
+  isyeriKodu: string
+  /** Şifreler yalnızca bu istekte backend'e gider; yanıtta ve depoda son 4 karakteri kalır */
+  sistemSifre: string
+  isyeriSifre: string
+  kasaCredentialId?: string
+}
+
+export interface KamuDogrulamaCozRequest {
+  kod: string
+}
+
+export interface KamuDogrulamaCozResponse {
+  /** Çalıştırılan adımların kısa özeti, ör. "Vergi borcu sorgulandı" */
+  ozet: string[]
 }

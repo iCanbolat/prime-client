@@ -60,6 +60,7 @@ export const GECERLILIK_GEREKEN: ArsivKategori[] = [
   "IMZA_SIRKULERI",
   "FAALIYET_BELGESI",
   "KIRA_SOZLESMESI",
+  "BORCU_YOKTUR",
 ]
 
 /** Kaç gün kala "yakında doluyor" sayılır */
@@ -101,6 +102,7 @@ export const KATEGORI_SIRASI: ArsivKategori[] = [
   "TEBLIGAT",
   "BORDRO",
   "SGK_BELGESI",
+  "BORCU_YOKTUR",
   "DIGER",
 ]
 

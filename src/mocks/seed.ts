@@ -1,6 +1,7 @@
 import { Faker, base, en, tr } from "@faker-js/faker"
 
 import { createBordroVerisi } from "@/mocks/factories/bordro"
+import { createBorcVerisi } from "@/mocks/factories/borc"
 import { createArsivDosyalari } from "@/mocks/factories/arsiv"
 import { createEBelgeVerisi } from "@/mocks/factories/e-belge"
 import { createEvrakTalepleri } from "@/mocks/factories/evrak-talebi"
@@ -70,6 +71,12 @@ export function createSeed(seed: number = DEFAULT_SEED): DbState {
     mukellef,
     personelIds
   )
+  // Ayrı tohumlu faker kullanır (ortak faker sırası kaymaz)
+  const { arsiv: borcArsivi, ...borc } = createBorcVerisi(
+    mukellef,
+    tebligat.tebligatErisim,
+    personelIds
+  )
   // Faker kullanmaz; okuyucu gelen id'sinden kendi tohumunu üretir
   const fisAktarimi = createFisAktarimiVerisi(
     mukellef,
@@ -88,7 +95,7 @@ export function createSeed(seed: number = DEFAULT_SEED): DbState {
     credential: [],
     kasa: [],
     takvim,
-    arsiv: [...arsiv, ...bordroArsivi],
+    arsiv: [...arsiv, ...bordroArsivi, ...borcArsivi],
     talep: fisAktarimi.talep,
     gelen: fisAktarimi.gelen,
     gorev,
@@ -105,5 +112,6 @@ export function createSeed(seed: number = DEFAULT_SEED): DbState {
     fis: fisAktarimi.fis,
     fisHesapAyari: [],
     lucaAktarim: [],
+    ...borc,
   }
 }

@@ -40,6 +40,12 @@ import type {
   MuhasebeFisi,
   FisHesapAyari,
   LucaAktarim,
+  SgkErisim,
+  VergiLevhasi,
+  BorcSorgusu,
+  BorcuYokturTalebi,
+  KamuDogrulama,
+  KamuTarama,
 } from "@/types/domain"
 
 export interface DbState {
@@ -105,9 +111,20 @@ export interface DbState {
   bordro: BordroDonemi[]
   /** İşe giriş / çıkış bildirim takibi */
   isHareketi: IsHareketi[]
+  /** Mükellef başına SGK İşveren Sistemi erişimi (şifreler burada da tutulmaz) */
+  sgkErisim: SgkErisim[]
+  /** GİB'den alınan vergi levhaları (PDF arşivde) */
+  vergiLevhasi: VergiLevhasi[]
+  /** Mükellef × kurum son borç sorgusu (id = `${mukellefId}:${kurum}`) */
+  borcSorgusu: BorcSorgusu[]
+  borcuYoktur: BorcuYokturTalebi[]
+  /** Personelin çözmesini bekleyen GİB / SGK doğrulama ekranları */
+  kamuDogrulama: KamuDogrulama[]
+  /** Gece borç / levha sorgusu çalışmaları (en yeni 30) */
+  kamuTarama: KamuTarama[]
 }
 
-export const STORAGE_KEY = "prime-ofis:db:v16"
+export const STORAGE_KEY = "prime-ofis:db:v17"
 
 const ID_PREFIX: Record<keyof DbState, string> = {
   buro: "b",
@@ -144,6 +161,12 @@ const ID_PREFIX: Record<keyof DbState, string> = {
   lucaAktarim: "la",
   bordro: "bo",
   isHareketi: "ih",
+  sgkErisim: "se",
+  vergiLevhasi: "vl",
+  borcSorgusu: "bs",
+  borcuYoktur: "by",
+  kamuDogrulama: "kd",
+  kamuTarama: "kt",
 }
 
 let state: DbState | null = null
@@ -288,6 +311,12 @@ export const db = {
   lucaAktarim: collection("lucaAktarim"),
   bordro: collection("bordro"),
   isHareketi: collection("isHareketi"),
+  sgkErisim: collection("sgkErisim"),
+  vergiLevhasi: collection("vergiLevhasi"),
+  borcSorgusu: collection("borcSorgusu"),
+  borcuYoktur: collection("borcuYoktur"),
+  kamuDogrulama: collection("kamuDogrulama"),
+  kamuTarama: collection("kamuTarama"),
 }
 
 /** Veritabanını seed'e sıfırlar (Ayarlar → Geliştirici ve testler). */

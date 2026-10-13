@@ -1,6 +1,7 @@
 import type { IconSvgElement } from "@hugeicons/react"
 import {
   Calendar03Icon,
+  Coins01Icon,
   DashboardSquare01Icon,
   FileImportIcon,
   Invoice01Icon,
@@ -26,7 +27,12 @@ export interface NavItem {
   keywords?: string[]
   roles?: Rol[]
   /** Menüde sayaç rozeti gösterilecek veri */
-  sayac?: "gelenEvrak" | "yanitBekleyen" | "acikTebligat" | "fisTaslak"
+  sayac?:
+    | "gelenEvrak"
+    | "yanitBekleyen"
+    | "acikTebligat"
+    | "fisTaslak"
+    | "kamuDogrulama"
 }
 
 export interface NavGroup {
@@ -130,6 +136,21 @@ export const NAV_GROUPS: NavGroup[] = [
           "gib",
         ],
         sayac: "acikTebligat",
+      },
+      {
+        title: "Borç ve levha",
+        to: "/borc-levha",
+        icon: Coins01Icon,
+        keywords: [
+          "vergi borcu",
+          "sgk borcu",
+          "prim borcu",
+          "vergi levhası",
+          "borcu yoktur",
+          "ivd",
+          "sgk",
+        ],
+        sayac: "kamuDogrulama",
       },
       {
         title: "Bordro takibi",

@@ -1,6 +1,7 @@
 import {
   Alert02Icon,
   AtIcon,
+  Coins01Icon,
   Folder01Icon,
   InboxDownloadIcon,
   Invoice03Icon,
@@ -24,6 +25,7 @@ export type BildirimKategori =
   | "mukellef"
   | "tahsilat"
   | "tebligat"
+  | "borc"
   | "uyari"
   | "sistem"
 
@@ -72,6 +74,11 @@ export const BILDIRIM_GORUNUM: Record<
     className: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
     etiket: "e-Tebligat",
   },
+  borc: {
+    icon: Coins01Icon,
+    className: "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+    etiket: "Borç ve levha",
+  },
   uyari: {
     icon: Alert02Icon,
     className: "bg-destructive/10 text-destructive",
@@ -97,6 +104,7 @@ const OZEL: Partial<Record<BildirimTur, BildirimKategori>> = {
   SIFRE_SILINDI: "uyari",
   SABLON_GUNCELLENDI: "sistem",
   BEYAN_DURUMU_GUNCELLENDI: "gorev",
+  BORC_TESPIT_EDILDI: "uyari",
 }
 
 /** Tür önekinden kategori türetilir; istisnalar `OZEL` tablosunda. */
@@ -114,6 +122,13 @@ export function turKategorisi(tur: BildirimTur): BildirimKategori {
   if (tur.startsWith("ARSIV_")) return "arsiv"
   if (tur.startsWith("MUKELLEF_")) return "mukellef"
   if (tur.startsWith("TEBLIGAT_")) return "tebligat"
+  if (
+    tur.startsWith("BORC") ||
+    tur.startsWith("SGK_") ||
+    tur.startsWith("KAMU_") ||
+    tur === "VERGI_LEVHASI_ALINDI"
+  )
+    return "borc"
   if (
     tur.startsWith("TAHSILAT_") ||
     tur.startsWith("ODEME_") ||
