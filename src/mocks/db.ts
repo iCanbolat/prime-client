@@ -46,6 +46,7 @@ import type {
   BorcuYokturTalebi,
   KamuDogrulama,
   KamuTarama,
+  LucaHesapKaydi,
 } from "@/types/domain"
 
 export interface DbState {
@@ -122,9 +123,11 @@ export interface DbState {
   kamuDogrulama: KamuDogrulama[]
   /** Gece borç / levha sorgusu çalışmaları (en yeni 30) */
   kamuTarama: KamuTarama[]
+  /** Büronun Luca portal kullanıcısı (0 ya da 1 kayıt, id `buro`) */
+  lucaHesap: LucaHesapKaydi[]
 }
 
-export const STORAGE_KEY = "prime-ofis:db:v17"
+export const STORAGE_KEY = "prime-ofis:db:v18"
 
 const ID_PREFIX: Record<keyof DbState, string> = {
   buro: "b",
@@ -167,6 +170,7 @@ const ID_PREFIX: Record<keyof DbState, string> = {
   borcuYoktur: "by",
   kamuDogrulama: "kd",
   kamuTarama: "kt",
+  lucaHesap: "lh",
 }
 
 let state: DbState | null = null
@@ -317,6 +321,7 @@ export const db = {
   borcuYoktur: collection("borcuYoktur"),
   kamuDogrulama: collection("kamuDogrulama"),
   kamuTarama: collection("kamuTarama"),
+  lucaHesap: collection("lucaHesap"),
 }
 
 /** Veritabanını seed'e sıfırlar (Ayarlar → Geliştirici ve testler). */

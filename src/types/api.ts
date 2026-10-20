@@ -47,7 +47,6 @@ import type {
   EFaturaYanit,
   GibDurumu,
   EntegratorBaglanti,
-  EntegratorOrtam,
   KontorAlim,
   Mizan,
   MizanHesap,
@@ -77,6 +76,7 @@ import type {
   LucaAktarim,
   LucaSablonAyari,
   MuhasebeFisi,
+  LucaHesapDurumu,
 } from "@/types/domain"
 import type { BordroUyari } from "@/features/bordro/kurallar"
 import type { TebligatSureDurumu } from "@/features/tebligat/kurallar"
@@ -608,10 +608,9 @@ export type EntegratorBaglantiView = EntegratorBaglanti & {
   sorumluPersonelId: string
 }
 
+/** Mükellefi büro Luca hesabındaki bir firmaya eşler */
 export interface BaglantiKaydetRequest {
-  /** Yalnızca backend'e iletilir; yanıtta ve istemci durumunda tutulmaz. */
-  apiAnahtari: string
-  ortam: EntegratorOrtam
+  lucaFirmaId: string
 }
 
 export type EBelgeSiralama = "tarih" | "toplam"
@@ -665,11 +664,6 @@ export interface EBelgeKalem {
 export type EBelgeDetay = EBelgeView & {
   kalemler: EBelgeKalem[]
   mukellefVknTckn: string
-}
-
-export interface EFaturaYanitRequest {
-  karar: "KABUL" | "RED"
-  neden?: string
 }
 
 export interface EBelgeIcerikResponse {
@@ -754,6 +748,9 @@ export interface KontorOzetResponse {
   mukellefler: KontorMukellefSatiri[]
   /** Yeniden eskiye */
   alimlar: KontorAlimView[]
+  /** Luca'nın bildirdiği bakiye (portal modunda son senkronda okunur) */
+  lucaBakiye?: number
+  lucaBakiyeTarihi?: string
 }
 
 export interface KontorAlimRequest {
@@ -1267,10 +1264,6 @@ export interface TopluAktarimSonucu {
   hatalar: { satir: number; mesaj: string }[]
 }
 
-export interface MukellefTopluRequest {
-  kayitlar: { satir: number; mukellef: MukellefInput }[]
-}
-
 export interface CredentialTopluRequest {
   /** Mükellef + sistem için kayıt varsa güncellenir; yoksa atlanır */
   uzerineYaz: boolean
@@ -1630,4 +1623,69 @@ export interface KamuDogrulamaCozRequest {
 export interface KamuDogrulamaCozResponse {
   /** Çalıştırılan adımların kısa özeti, ör. "Vergi borcu sorgulandı" */
   ozet: string[]
+}
+
+// --- Luca hesabı (portal) ------------------------------------------------------
+
+export type { LucaHesapDurumu }
+
+/** Büronun Luca kullanıcısı; şifre hiçbir yanıtta dönmez */
+export interface LucaHesapView {
+  kullanici: string
+  /** Şifrenin son 4 karakteri */
+  sifreIpucu: string
+  durum: LucaHesapDurumu
+  hataMesaji?: string
+  sonGiris?: string
+  kontorBakiye?: number
+  kontorTarihi?: string
+  guncelleyenId: string
+  guncellemeTarihi: string
+}
+
+export interface LucaHesapRequest {
+  kullanici: string
+  /** Boş verilirse mevcut şifre korunur (yalnızca kullanıcı adı değişmiyorsa) */
+  sifre?: string
+}
+
+export interface LucaFirma {
+  firmaId: string
+  unvan: string
+  vknTckn?: string
+  vergiDairesi?: string
+  eFatura: boolean
+  eArsiv: boolean
+  eDefter: boolean
+  /** Bu firmaya eşlenmiş mükellef */
+  mukellefId?: string
+  /** Eşlenmemiş, ama VKN/TCKN'si kayıtlı mükellefle aynı: aktarımda o mükellefe eşlenir */
+  eslesenMukellefId?: string
+}
+
+/** `POST /luca-hesap/firmalar/aktar`: seçilen firmalardan mükellef oluşturur / eşler */
+export interface LucaFirmaAktarimRequest {
+  firmaIdler: string[]
+  /** Yeni oluşturulan mükelleflerin sorumlusu */
+  sorumluPersonelId: string
+}
+
+export interface LucaFirmaAktarimSonucu {
+  /** Yeni mükellef açılıp eşlenen firma */
+  olusturulan: number
+  /** VKN/TCKN'si kayıtlı mükellefe eşlenen firma */
+  eslenen: number
+  /** Zaten eşli olan firma */
+  atlanan: number
+  hatalar: { firmaId: string; unvan: string; mesaj: string }[]
+}
+
+/** Personelin çözeceği doğrulama ekranı (görsel ~5 dk geçerli) */
+export interface LucaDogrulamaView {
+  gorselDataUrl: string
+  sonGecerlilik: string
+}
+
+export interface LucaDogrulamaRequest {
+  kod: string
 }
